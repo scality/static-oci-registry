@@ -27,7 +27,7 @@ func (c *Container) GetHTTPServer() *http.Server {
 		})
 
 		c.httpServer = &http.Server{
-			Addr:              ":8080",
+			Addr:              c.config.HTTP.Addr,
 			Handler:           router,
 			ReadHeaderTimeout: timeoutDurationInSeconds * time.Second,
 		}

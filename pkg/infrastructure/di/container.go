@@ -1,11 +1,27 @@
 package di
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+	"platform-static-registry/cmd/config"
+
+	"github.com/rs/zerolog"
+)
 
 type Container struct {
+	// baseCtx is the base context for the application.
+	baseCtx context.Context //nolint:containedctx
+
+	config *config.Environment
+
+	logger *zerolog.Logger
+
 	httpServer *http.Server
 }
 
-func NewContainer() *Container {
-	return &Container{}
+func NewContainer(ctx context.Context, cfg *config.Environment) *Container {
+	return &Container{
+		baseCtx: ctx,
+		config:  cfg,
+	}
 }
