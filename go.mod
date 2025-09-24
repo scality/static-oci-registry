@@ -1,4 +1,4 @@
-module platform-static-registry
+module static-oci-registry
 
 go 1.25.1
 

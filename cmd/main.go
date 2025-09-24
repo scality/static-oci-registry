@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"platform-static-registry/cmd/config"
-	"platform-static-registry/pkg/infrastructure/di"
+	"static-oci-registry/cmd/config"
+	"static-oci-registry/pkg/infrastructure/di"
 	"syscall"
 	"time"
 )

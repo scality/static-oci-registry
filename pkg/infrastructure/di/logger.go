@@ -1,8 +1,8 @@
 package di
 
 import (
-	"platform-static-registry/cmd/config"
-	"platform-static-registry/pkg/infrastructure/logger"
+	"static-oci-registry/cmd/config"
+	"static-oci-registry/pkg/infrastructure/logger"
 
 	"github.com/rs/zerolog"
 )

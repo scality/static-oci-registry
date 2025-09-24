@@ -3,7 +3,7 @@ package di
 import (
 	"context"
 	"net/http"
-	"platform-static-registry/cmd/config"
+	"static-oci-registry/cmd/config"
 
 	"github.com/rs/zerolog"
 )
