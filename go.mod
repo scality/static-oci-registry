@@ -1,8 +1,9 @@
-module static-oci-registry
+module github.com/scality/static-oci-registry
 
 go 1.25.1
 
 require (
+	github.com/hashicorp/go-version v1.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.34.0
 	github.com/sethvargo/go-envconfig v1.3.0

@@ -23,11 +23,15 @@ const ApplicationName = "static-oci-registry"
 
 type (
 	Environment struct {
-		LogLevel string `env:"LOG_LEVEL, default=info"`
+		LogLevel string `env:"LOG_LEVEL, default=debug"`
 		HTTP     HTTP   `env:",prefix=HTTP_"`
+		FS       FS     `env:",prefix=FS_"`
 	}
 	HTTP struct {
 		Addr string `env:"ADDR, default=:8080"`
+	}
+	FS struct {
+		Root string `env:"ROOT, default=/data"`
 	}
 )
 

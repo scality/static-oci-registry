@@ -26,6 +26,9 @@ func (c *Container) GetHTTPServer() *http.Server {
 			writer.WriteHeader(http.StatusOK)
 		})
 
+		// OCI tag list endpoint (end-8a and 8b of the spec)
+		router.Handle("/v2/{image}/tags/list", c.getListTagsHandler())
+
 		c.httpServer = &http.Server{
 			Addr:              c.config.HTTP.Addr,
 			Handler:           router,

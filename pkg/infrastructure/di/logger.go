@@ -1,8 +1,8 @@
 package di
 
 import (
-	"static-oci-registry/cmd/config"
-	"static-oci-registry/pkg/infrastructure/logger"
+	"github.com/scality/static-oci-registry/cmd/config"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/logger"
 
 	"github.com/rs/zerolog"
 )
