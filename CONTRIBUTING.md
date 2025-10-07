@@ -31,3 +31,8 @@ A test target is provided to generate an example registry root:
 ```bash
 make testfs
 ```
+
+You can then run the registry against it:
+```bash
+docker run -e LOG_LEVEL='debug' -e HTTP_ADDR=':8080' -e FS_ROOT='/solutions' -v ./_testfs:/solutions -p 8080:8080 -it static-oci-registry:latest
+```

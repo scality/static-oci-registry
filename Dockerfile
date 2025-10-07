@@ -14,6 +14,6 @@ FROM scratch
 
 LABEL org.opencontainers.image.source=https://github.com/scality/static-oci-registry
 
-COPY --from=builder /app/static-oci-registry /rootfs/usr/local/lib/containers/static-oci-registry/static-oci-registry
+COPY --from=builder /app/static-oci-registry /bin/static-oci-registry
 
-ENTRYPOINT ["/rootfs/usr/local/lib/containers/static-oci-registry/static-oci-registry"]
+ENTRYPOINT ["/bin/static-oci-registry"]
