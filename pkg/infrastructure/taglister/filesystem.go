@@ -4,22 +4,23 @@ package taglister
 import (
 	"os"
 	"slices"
+
 	"github.com/scality/static-oci-registry/pkg/domain"
-	"github.com/scality/static-oci-registry/pkg/service"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
 
 type FileSystem struct {
-	logger *zerolog.Logger
-	imageFinder service.ImageFinder
-	fsRoot string
+	logger      *zerolog.Logger
+	imageFinder *imagefinder.FileSystem
+	fsRoot      string
 }
 
 func NewFileSystem(
 	l *zerolog.Logger,
-	i service.ImageFinder,
+	i *imagefinder.FileSystem,
 	r string,
 ) (*FileSystem, error) {
 	// make sure r exists
@@ -34,9 +35,9 @@ func NewFileSystem(
 	}
 
 	return &FileSystem{
-		logger: l,
+		logger:      l,
 		imageFinder: i,
-		fsRoot: r,
+		fsRoot:      r,
 	}, nil
 }
 
@@ -55,11 +56,11 @@ func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutp
 		tagEntries, err := os.ReadDir(dir)
 		if err != nil {
 			return nil, errors.Wrap(domain.ErrRegistryInternal,
-							"failed to read an image dir in filesystem registry")
+				"failed to read an image dir in filesystem registry")
 		}
 
 		for _, entry := range tagEntries {
-			if ! entry.IsDir() {
+			if !entry.IsDir() {
 				continue
 			}
 

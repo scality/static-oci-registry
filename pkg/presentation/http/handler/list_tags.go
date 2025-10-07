@@ -72,11 +72,12 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		tagLimit, err := strconv.ParseInt(n, 0, 0)
 		if err != nil {
 			httplayer.HandleError(w, errors.Wrapf(domain.ErrInvalidParameter, "%s", err),
-									n, http.StatusNotFound, h.logger)
+				n, http.StatusNotFound, h.logger)
+
 			return
 		}
 
-		if tagLimit < 0  || tagLimit > 1000 {
+		if tagLimit < 0 || tagLimit > 1000 {
 			httplayer.HandleError(w, domain.ErrInvalidParameter, n, http.StatusNotFound, h.logger)
 			return
 		}

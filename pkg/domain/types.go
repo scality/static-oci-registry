@@ -9,18 +9,17 @@ import (
 // https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#workflow-categories
 const (
 	// match an image name
-	// e.g. myimage, my_image, my-image, my.image, myimage123, my_repo/myimage, my_repo.io/my_image
+	// e.g. myimage, my_image, my-image, my.image, myimage123, my_repo/myimage, my_repo.io/my_image.
 	imageNameRegex = `^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*$`
 
-
 	// match a tag name
-	// e.g. latest, v1.0.0, 1.0.0-beta, my_tag-123
-	imageTagRegex  = `^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*$`
+	// e.g. latest, v1.0.0, 1.0.0-beta, my_tag-123.
+	imageTagRegex = `^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*$`
 )
 
 var (
 	imageNameChecker = regexp.MustCompile(imageNameRegex)
-	imageTagChecker = regexp.MustCompile(imageTagRegex)
+	imageTagChecker  = regexp.MustCompile(imageTagRegex)
 )
 
 type (
@@ -60,7 +59,7 @@ func (t Tag) String() string {
 }
 
 // from the OCI distribution spec:
-// ` If the list is not empty, the tags MUST be in lexical order 
+// ` If the list is not empty, the tags MUST be in lexical order
 // (i.e. case-insensitive alphanumeric order).`
 // https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#listing-tags
 func CompareTags(i, j Tag) int {

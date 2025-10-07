@@ -47,27 +47,27 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, error) {
 	if err != nil {
 		// maybe use wrapf
 		return nil, errors.Wrap(domain.ErrRegistryInternal,
-							"failed to read fs root in filesystem registry")
+			"failed to read fs root in filesystem registry")
 	}
 
 	found := make([]string, 0)
 
 	for _, solution := range solutions {
-		if ! solution.IsDir() {
+		if !solution.IsDir() {
 			continue
 		}
 
 		versionCandidates, err := os.ReadDir(fs.fsRoot + "/" + solution.Name())
 		if err != nil {
 			return nil, errors.Wrap(domain.ErrRegistryInternal,
-								"failed to read solution dir in filesystem registry")
+				"failed to read solution dir in filesystem registry")
 		}
 
 		versions := make([]os.DirEntry, 0)
 		unsortedVersions := make([]os.DirEntry, 0)
 
 		for _, candidate := range versionCandidates {
-			if ! candidate.IsDir() {
+			if !candidate.IsDir() {
 				continue
 			}
 
@@ -78,6 +78,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, error) {
 					Msg("invalid version directory, skipping")
 
 				unsortedVersions = append(unsortedVersions, candidate)
+
 				continue
 			}
 
@@ -105,8 +106,9 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, error) {
 			if err != nil {
 				if !os.IsNotExist(err) {
 					return nil, errors.Wrap(domain.ErrRegistryInternal,
-										"failed to stat image dir in filesystem registry")
+						"failed to stat image dir in filesystem registry")
 				}
+
 				continue
 			}
 
@@ -123,7 +125,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, error) {
 
 	if len(found) == 0 {
 		return nil, errors.Wrap(domain.ErrImageNotFound,
-							"no tags found for image in filesystem registry")
+			"no tags found for image in filesystem registry")
 	}
 
 	return found, nil

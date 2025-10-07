@@ -2,10 +2,9 @@ package di
 
 import (
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
-	"github.com/scality/static-oci-registry/pkg/service"
 )
 
-func (c *Container) getTagLister() service.TagLister {
+func (c *Container) getTagLister() *taglister.FileSystem {
 	if c.tagLister == nil {
 		l, err := taglister.NewFileSystem(
 			c.GetLogger(),

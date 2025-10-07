@@ -3,9 +3,11 @@ package di
 import (
 	"context"
 	"net/http"
+
 	"github.com/scality/static-oci-registry/cmd/config"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
 	"github.com/scality/static-oci-registry/pkg/presentation/http/handler"
-	"github.com/scality/static-oci-registry/pkg/service"
 	"github.com/scality/static-oci-registry/pkg/usecase"
 
 	"github.com/rs/zerolog"
@@ -25,8 +27,8 @@ type Container struct {
 
 	listTagsUseCase *usecase.ListTags
 
-	tagLister service.TagLister
-	imageFinder service.ImageFinder
+	tagLister   *taglister.FileSystem
+	imageFinder *imagefinder.FileSystem
 }
 
 func NewContainer(ctx context.Context, cfg *config.Environment) *Container {

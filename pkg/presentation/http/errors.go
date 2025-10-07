@@ -3,6 +3,7 @@ package http
 import (
 	"fmt"
 	"net/http"
+
 	"github.com/scality/static-oci-registry/pkg/domain"
 
 	"github.com/pkg/errors"
@@ -20,14 +21,14 @@ const (
 	// DigestInvalid        OCIHTTPErrorCode = "DIGEST_INVALID"
 	// ManifestBlobUnknown  OCIHTTPErrorCode = "MANIFEST_BLOB_UNKNOWN"
 	// ManifestInvalid      OCIHTTPErrorCode = "MANIFEST_INVALID"
-	// ManifestUnknown      OCIHTTPErrorCode = "MANIFEST_UNKNOWN"
-	NameInvalid          OCIHTTPErrorCode = "NAME_INVALID"
-	NameUnknown          OCIHTTPErrorCode = "NAME_UNKNOWN"
+	// ManifestUnknown      OCIHTTPErrorCode = "MANIFEST_UNKNOWN".
+	NameInvalid OCIHTTPErrorCode = "NAME_INVALID"
+	NameUnknown OCIHTTPErrorCode = "NAME_UNKNOWN"
 	// SizeInvalid         OCIHTTPErrorCode = "SIZE_INVALID"
 	// Unauthorized        OCIHTTPErrorCode = "UNAUTHORIZED"
-	// Denied              OCIHTTPErrorCode = "DENIED"
-	Unsupported         OCIHTTPErrorCode = "UNSUPPORTED"
-	// TooManyRequests     OCIHTTPErrorCode = "TOO_MANY_REQUESTS"
+	// Denied              OCIHTTPErrorCode = "DENIED".
+	Unsupported OCIHTTPErrorCode = "UNSUPPORTED"
+	// TooManyRequests     OCIHTTPErrorCode = "TOO_MANY_REQUESTS".
 )
 
 type ErrorResponse struct {
@@ -36,8 +37,8 @@ type ErrorResponse struct {
 
 type ErrorObject struct {
 	Code    OCIHTTPErrorCode `json:"code"`
-	Message string    `json:"message"`
-	Detail  string    `json:"detail,omitempty"`
+	Message string           `json:"message"`
+	Detail  string           `json:"detail,omitempty"`
 }
 
 func NewErrorResponse() *ErrorResponse {
@@ -59,6 +60,7 @@ func HandleError(w http.ResponseWriter, err error, data any, statusCode int, l *
 	l.Warn().Err(err).Msg("handling error")
 
 	var ociCode OCIHTTPErrorCode
+
 	switch {
 	case errors.Is(errors.Cause(err), domain.ErrInvalidImageName):
 		ociCode = NameInvalid
@@ -76,6 +78,7 @@ func HandleError(w http.ResponseWriter, err error, data any, statusCode int, l *
 	default:
 		l.Warn().Err(err).Msg("is an unhandled error type")
 		http.Error(w, err.Error(), statusCode)
+
 		return
 	}
 
