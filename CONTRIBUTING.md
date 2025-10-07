@@ -18,11 +18,16 @@ This documents provides the guidelines for contributing to this project.
 
 ### Prerequisites
 - Docker
-- go
+- make
 
 ### Building
 
-You can build the dockerfile directly or run
+You can build the docker container using:
 ```bash
-go build cmd/main.go
+make build
+```
+
+A test target is provided to generate an example registry root:
+```bash
+make testfs
 ```
