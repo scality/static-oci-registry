@@ -55,8 +55,9 @@ func (er *ErrorResponse) AddError(code OCIHTTPErrorCode, message, detail string)
 	})
 }
 
+// nolint:funlen // this contains a long, unsplittable switch statement
 // HandleError handles domain errors and sends appropriate HTTP responses based on the error type.
-func HandleError(w http.ResponseWriter, err error, data any, statusCode int, l *zerolog.Logger) {
+func HandleError(w http.ResponseWriter, err error, data any, l *zerolog.Logger) {
 	l.Warn().Err(err).Msg("handling error")
 
 	var ociCode OCIHTTPErrorCode
@@ -77,7 +78,7 @@ func HandleError(w http.ResponseWriter, err error, data any, statusCode int, l *
 		return
 	default:
 		l.Warn().Err(err).Msg("is an unhandled error type")
-		http.Error(w, err.Error(), statusCode)
+		http.Error(w, err.Error(), http.StatusNotFound)
 
 		return
 	}
@@ -98,6 +99,5 @@ func HandleError(w http.ResponseWriter, err error, data any, statusCode int, l *
 
 	errorResponse.AddError(ociCode, errors.Cause(err).Error(), detail)
 
-	w.WriteHeader(statusCode)
-	RespondWithJSON(w, errorResponse, statusCode, l)
+	RespondWithJSON(w, errorResponse, http.StatusNotFound, l)
 }

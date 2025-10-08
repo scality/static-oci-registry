@@ -35,13 +35,13 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err := img.Validate()
 	if err != nil {
-		httplayer.HandleError(w, err, img, http.StatusNotFound, h.logger)
+		httplayer.HandleError(w, err, img, h.logger)
 		return
 	}
 
 	listTagsOutput, err := h.listTagsUseCase.Execute(img)
 	if err != nil {
-		httplayer.HandleError(w, err, img, http.StatusNotFound, h.logger)
+		httplayer.HandleError(w, err, img, h.logger)
 		return
 	}
 
@@ -53,12 +53,12 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		err := lastTag.Validate()
 		if err != nil {
-			httplayer.HandleError(w, err, lastTag, http.StatusNotFound, h.logger)
+			httplayer.HandleError(w, err, lastTag, h.logger)
 			return
 		}
 
 		if !slices.Contains(listTagsOutput.Tags, lastTag) {
-			httplayer.HandleError(w, domain.ErrTagNotFound, lastTag, http.StatusNotFound, h.logger)
+			httplayer.HandleError(w, domain.ErrTagNotFound, lastTag, h.logger)
 			return
 		}
 
@@ -72,13 +72,13 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		tagLimit, err := strconv.ParseInt(n, 0, 0)
 		if err != nil {
 			httplayer.HandleError(w, errors.Wrapf(domain.ErrInvalidParameter, "%s", err),
-				n, http.StatusNotFound, h.logger)
+				n, h.logger)
 
 			return
 		}
 
 		if tagLimit < 0 || tagLimit > 1000 {
-			httplayer.HandleError(w, domain.ErrInvalidParameter, n, http.StatusNotFound, h.logger)
+			httplayer.HandleError(w, domain.ErrInvalidParameter, n, h.logger)
 			return
 		}
 

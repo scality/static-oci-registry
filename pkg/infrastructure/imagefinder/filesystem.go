@@ -1,3 +1,4 @@
+// nolint:cyclop // this is complex infrastructure logic by nature
 package imagefinder
 
 import (
@@ -37,6 +38,8 @@ func NewFileSystem(
 	}, nil
 }
 
+// nolint:gocognit,funlen // this is the core function of this service
+// and can not be split meaningfully.
 func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, error) {
 	l := fs.logger.With().Str("image_name", string(imageName)).Logger()
 	l.Info().Msg("Finding image in filesystem registry")

@@ -1,4 +1,4 @@
-//nolint:cyclop // this is infrastructure code and is inherently complex
+// nolint:cyclop // this is complex infrastructure logic by nature
 package taglister
 
 import (
@@ -41,6 +41,8 @@ func NewFileSystem(
 	}, nil
 }
 
+// nolint:gocognit,funlen // this is the core function of this service
+// and can not be split meaningfully.
 func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutput, error) {
 	l := fs.logger.With().Str("image_name", string(imageName)).Logger()
 	l.Info().Msg("Finding tags in filesystem registry")
