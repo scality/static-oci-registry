@@ -26,6 +26,12 @@ type (
 	ImageName string
 	Tag       string
 
+	ListTagsInput struct {
+		Name ImageName
+		N    *int
+		Last *Tag
+	}
+
 	// this is the output format defined in the OCI distribution spec
 	// https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#listing-tags
 	ListTagsOutput struct {

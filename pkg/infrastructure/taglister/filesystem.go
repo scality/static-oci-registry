@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/scality/static-oci-registry/pkg/domain"
+	apperrors "github.com/scality/static-oci-registry/pkg/errors"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 
 	"github.com/pkg/errors"
@@ -43,13 +44,15 @@ func NewFileSystem(
 
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
-func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutput, error) {
+func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutput,
+	*apperrors.Error,
+) {
 	l := fs.logger.With().Str("image_name", string(imageName)).Logger()
 	l.Info().Msg("Finding tags in filesystem registry")
 	// the registry is stored in the filesystem at fsRoot
 	candidates, err := fs.imageFinder.FindImage(imageName)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find image in filesystem registry")
+		return nil, err.Wrap("failed to find image in filesystem registry")
 	}
 
 	allTags := make([]domain.Tag, 0, len(candidates))
@@ -57,8 +60,9 @@ func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutp
 	for _, dir := range candidates {
 		tagEntries, err := os.ReadDir(dir)
 		if err != nil {
-			return nil, errors.Wrap(domain.ErrRegistryInternal,
-				"failed to read an image dir in filesystem registry")
+			return nil, apperrors.New(domain.ErrRegistryInternal, nil).
+				WrapErr(err).
+				Wrap("failed to read an image dir in filesystem registry")
 		}
 
 		for _, entry := range tagEntries {

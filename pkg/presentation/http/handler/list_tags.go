@@ -2,11 +2,11 @@ package handler
 
 import (
 	"net/http"
-	"slices"
 	"strconv"
 
-	"github.com/pkg/errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
+	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
+	"github.com/scality/static-oci-registry/pkg/errors"
 	httplayer "github.com/scality/static-oci-registry/pkg/presentation/http"
 	"github.com/scality/static-oci-registry/pkg/usecase"
 
@@ -30,20 +30,22 @@ func NewListTags(
 	}
 }
 
-func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// nolint:funlen // this function is long because of all the checks and cannot be
+// meaningfully shortened or split
+// parses a query and return the input type for ListTags usecase.
+func parseQuery(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 	img := domain.ImageName(r.PathValue("image"))
 
 	err := img.Validate()
 	if err != nil {
-		httplayer.HandleError(w, err, img, h.logger)
-		return
+		// this is a domain error so no need to redefine it here
+		return nil, errors.FromCode(err, ocierrors.NameInvalid).
+			Wrap("error validating image name in query parser").
+			WithOCIMessage(err.Error()).
+			WithOCIDetail("image_name", string(img))
 	}
 
-	listTagsOutput, err := h.listTagsUseCase.Execute(img)
-	if err != nil {
-		httplayer.HandleError(w, err, img, h.logger)
-		return
-	}
+	listTagsInput := &domain.ListTagsInput{Name: img}
 
 	q := r.URL.Query()
 
@@ -53,38 +55,52 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		err := lastTag.Validate()
 		if err != nil {
-			httplayer.HandleError(w, err, lastTag, h.logger)
-			return
+			return nil, errors.FromCode(err, ocierrors.Unsupported).
+				Wrap("error validating last tag in query parser").
+				WithOCIMessage(err.Error()).
+				WithOCIDetail("last", last)
 		}
 
-		if !slices.Contains(listTagsOutput.Tags, lastTag) {
-			httplayer.HandleError(w, domain.ErrTagNotFound, lastTag, h.logger)
-			return
-		}
-
-		// return tags after lastTag without lastTag
-		i := slices.Index(listTagsOutput.Tags, lastTag)
-		listTagsOutput.Tags = listTagsOutput.Tags[i+1:]
+		listTagsInput.Last = &lastTag
 	}
 
 	n := q.Get("n")
 	if n != "" {
-		tagLimit, err := strconv.ParseInt(n, 0, 0)
+		nint, err := strconv.ParseInt(n, 0, 0)
 		if err != nil {
-			httplayer.HandleError(w, errors.Wrapf(domain.ErrInvalidParameter, "%s", err),
-				n, h.logger)
-
-			return
+			return nil, errors.FromCode(domain.ErrInvalidParameter, ocierrors.Unsupported).
+				WrapErr(err).
+				Wrap("error validating n parameter in query parser").
+				WithOCIMessage("Invalid integer value in n parameter").
+				WithOCIDetail("n", n)
 		}
+
+		tagLimit := int(nint)
 
 		if tagLimit < 0 || tagLimit > 1000 {
-			httplayer.HandleError(w, domain.ErrInvalidParameter, n, h.logger)
-			return
+			return nil, errors.FromCode(domain.ErrInvalidParameter, ocierrors.Unsupported).
+				Wrap("n parameter is out of range in query parser").
+				WithOCIMessage("n parameter must be between 0 and 1000").
+				WithOCIDetail("n", strconv.Itoa(tagLimit))
 		}
 
-		if int(tagLimit) < len(listTagsOutput.Tags) {
-			listTagsOutput.Tags = listTagsOutput.Tags[:tagLimit]
-		}
+		listTagsInput.N = &tagLimit
+	}
+
+	return listTagsInput, nil
+}
+
+func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	listTagsInput, err := parseQuery(r)
+	if err != nil {
+		httplayer.HandleError(w, err, h.logger)
+		return
+	}
+
+	listTagsOutput, err := h.listTagsUseCase.Execute(*listTagsInput)
+	if err != nil {
+		httplayer.HandleError(w, err, h.logger)
+		return
 	}
 
 	httplayer.RespondWithJSON(w, listTagsOutput, http.StatusOK, h.logger)
