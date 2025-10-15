@@ -7,7 +7,7 @@ import (
 
 	"github.com/scality/static-oci-registry/pkg/domain"
 	apperrors "github.com/scality/static-oci-registry/pkg/errors"
-	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
+	"github.com/scality/static-oci-registry/pkg/service"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -15,13 +15,13 @@ import (
 
 type FileSystem struct {
 	logger      *zerolog.Logger
-	imageFinder *imagefinder.FileSystem
+	imageFinder service.ImageFinder
 	fsRoot      string
 }
 
 func NewFileSystem(
 	l *zerolog.Logger,
-	i *imagefinder.FileSystem,
+	i service.ImageFinder,
 	r string,
 ) (*FileSystem, error) {
 	// make sure r exists
@@ -57,7 +57,12 @@ func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutp
 
 	allTags := make([]domain.Tag, 0, len(candidates))
 
-	for _, dir := range candidates {
+	for _, sv := range candidates {
+		dir := fs.fsRoot +
+			"/" + sv.Solution +
+			"/" + sv.Version +
+			"/" + string(imageName)
+
 		tagEntries, err := os.ReadDir(dir)
 		if err != nil {
 			return nil, apperrors.New(domain.ErrRegistryInternal, nil).

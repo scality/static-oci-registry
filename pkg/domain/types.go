@@ -23,6 +23,11 @@ var (
 )
 
 type (
+	SolutionVersion struct {
+		Solution string
+		Version  string
+	}
+
 	ImageName string
 	Tag       string
 

@@ -6,5 +6,5 @@ import (
 )
 
 type ImageFinder interface {
-	FindImage(imageName domain.ImageName) ([]string, *errors.Error)
+	FindImage(imageName domain.ImageName) ([]domain.SolutionVersion, *errors.Error)
 }

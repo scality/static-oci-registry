@@ -42,7 +42,9 @@ func NewFileSystem(
 
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
-func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, *apperrors.Error) {
+func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion,
+	*apperrors.Error,
+) {
 	l := fs.logger.With().Str("image_name", string(imageName)).Logger()
 	l.Info().Msg("Finding image in filesystem registry")
 	// walks the fsroot by solution and version and gathers a list of `solution/version` dirs
@@ -55,7 +57,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, *apperror
 			Wrap("failed to read fs root in filesystem registry")
 	}
 
-	found := make([]string, 0)
+	found := make([]domain.SolutionVersion, 0)
 
 	for _, solution := range solutions {
 		if !solution.IsDir() {
@@ -120,12 +122,10 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]string, *apperror
 			}
 
 			if info.IsDir() {
-				found = append(found,
-					fs.fsRoot+
-						"/"+solution.Name()+
-						"/"+candidate.Name()+
-						"/"+string(imageName),
-				)
+				found = append(found, domain.SolutionVersion{
+					Solution: solution.Name(),
+					Version:  candidate.Name(),
+				})
 			}
 		}
 	}
