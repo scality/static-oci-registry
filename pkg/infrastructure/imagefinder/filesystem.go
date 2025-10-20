@@ -131,7 +131,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 	}
 
 	if len(found) == 0 {
-		return nil, apperrors.FromCode(domain.ErrImageNotFound, ocierrors.Unsupported).
+		return nil, apperrors.FromCode(domain.ErrImageNotFound, ocierrors.NameUnknown).
 			Wrap("image not found in filesystem registry").
 			WithOCIMessage(domain.ErrImageNotFound.Error()).
 			WithOCIDetail("image_name", string(imageName))
