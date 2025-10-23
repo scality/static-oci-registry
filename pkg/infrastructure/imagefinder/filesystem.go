@@ -34,8 +34,10 @@ func NewFileSystem(
 		return nil, errors.New("passed FS_ROOT is not a directory")
 	}
 
+	logger := l.With().Str("imagefinder", "filesystem").Logger()
+
 	return &FileSystem{
-		logger: l,
+		logger: &logger,
 		fsRoot: r,
 	}, nil
 }
@@ -61,6 +63,9 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 
 	for _, solution := range solutions {
 		if !solution.IsDir() {
+			l.Warn().Str("solution", solution.Name()).
+				Msg("solutions in the root of the filesystem should all be directories")
+
 			continue
 		}
 
@@ -76,14 +81,18 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 
 		for _, candidate := range versionCandidates {
 			if !candidate.IsDir() {
+				l.Warn().Str("solution", solution.Name()).Str("version", candidate.Name()).
+					Msg("solution/version should be a directory")
+
 				continue
 			}
 
 			// validate that candidate.Name() is a valid semver
 			_, err := version.NewVersion(candidate.Name())
 			if err != nil {
-				l.Warn().Err(err).Str("version", candidate.Name()).
-					Msg("invalid version directory, skipping")
+				l.Warn().Err(err).Str("solution", solution.Name()).
+					Str("version", candidate.Name()).
+					Msg("invalid version directory name found in solution")
 
 				unsortedVersions = append(unsortedVersions, candidate)
 
@@ -121,12 +130,17 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 				continue
 			}
 
-			if info.IsDir() {
-				found = append(found, domain.SolutionVersion{
-					Solution: solution.Name(),
-					Version:  candidate.Name(),
-				})
+			if !info.IsDir() {
+				l.Warn().Str("solution", solution.Name()).Str("version", candidate.Name()).
+					Msg("solution/version/image_name should be a directory")
+
+				continue
 			}
+
+			found = append(found, domain.SolutionVersion{
+				Solution: solution.Name(),
+				Version:  candidate.Name(),
+			})
 		}
 	}
 
