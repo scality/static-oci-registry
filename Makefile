@@ -1,9 +1,12 @@
+DOCKER_HOST ?= unix:///var/run/docker.sock
+SKOPEO ?= skopeo
+SKOPEO_FLAGS ?= --format v2s2 --dest-compress --src-daemon-host $(DOCKER_HOST) --insecure-policy
+
 # build: build docker image and tag it as static-oci-registy:latest
 build:
 	docker build -t static-oci-registry:latest .
 .PHONY: build
 
-# TODO: add another solution here
 IMAGES := \
   'my-solution v1.0.0 docker.io/library/postgres 9' \
   'my-solution v2.0.1-rc.1 docker.io/library/postgres 13' \
@@ -22,9 +25,10 @@ testfs: clean
 		version=$$2; \
 		image=$$3; \
 		tag=$$4; \
+		docker build -f ./test/target.Dockerfile --build-arg VERSION=$$tag -t test-image:$$tag .; \
 		mkdir -p _testfs/$$solution/$$version/$$image; \
-		skopeo copy docker://$$image:$$tag dir:_testfs/$$solution/$$version/$$image/$$tag; \
-	done
+		$(SKOPEO) copy $(SKOPEO_FLAGS) docker-daemon:test-image:$$tag dir:_testfs/$$solution/$$version/$$image/$$tag; \
+	done > /dev/null
 
 clean:
 	rm -rf _testfs

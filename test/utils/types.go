@@ -98,12 +98,34 @@ func (s *TestSuite) FetchImage(re *RegistryEntry) {
 	// create dirs and files as needed
 	os.MkdirAll(re.ImagePath(s.FsRoot), 0o700)
 
-	// call skopeo to copy from registry
-	cmd := exec.Command(
-		"skopeo", "copy",
-		"docker://"+string(re.Image)+":"+re.Tag,
-		"dir:"+re.FullPath(s.FsRoot),
+	// get DOCKER_HOST env var, or use default if not set
+	dockerHost := os.Getenv("DOCKER_HOST")
+	if dockerHost == "" {
+		dockerHost = "unix:///var/run/docker.sock"
+	}
+
+	// docker build ../../test.Dockerfile --build-arg VERSION=re.Tag -t test-image:re.Tag .
+	buildCmd := exec.Command(
+		"docker", "build",
+		"-f", "../target.Dockerfile",
+		"--build-arg", "VERSION="+re.Tag,
+		"-t", "test-image:"+re.Tag,
+		".",
 	)
+	Expect(buildCmd.Run()).To(Succeed())
+
+	// skopeo copy with flags: --format v2s2 --dest-compress --src-daemon-host <<DOCKER_HOST>> --insecure-policy
+	skopeoArgs := []string{
+		"copy",
+		"--format", "v2s2",
+		"--dest-compress",
+		"--src-daemon-host", dockerHost,
+		"--insecure-policy",
+		"docker-daemon:test-image:" + re.Tag,
+		"dir:" + re.FullPath(s.FsRoot),
+	}
+	cmd := exec.Command("skopeo", skopeoArgs...)
+	cmd.Env = append(os.Environ(), "DOCKER_HOST="+dockerHost)
 
 	Expect(cmd.Run()).To(Succeed())
 }
