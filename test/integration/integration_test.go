@@ -60,7 +60,8 @@ func execRequest(client *http.Client, req *http.Request) (*http.Response, []byte
 	body, err := io.ReadAll(resp.Body)
 	Expect(err).NotTo(HaveOccurred())
 
-	return resp, body
+	// remove trailing newline if present
+	return resp, body[:len(body)-1]
 }
 
 func checkErrorResponse(body []byte, code ocierrors.OCIErrorCode) {

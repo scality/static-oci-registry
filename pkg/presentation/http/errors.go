@@ -31,7 +31,7 @@ func HandleError(w http.ResponseWriter, err error, l *zerolog.Logger) {
 	l.Warn().Err(err).Msg("handling error")
 
 	if errors.Is(errors.Cause(err), domain.ErrRegistryInternal) {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
 
@@ -44,5 +44,5 @@ func HandleError(w http.ResponseWriter, err error, l *zerolog.Logger) {
 	}
 
 	l.Warn().Err(err).Msg("is an unhandled error type")
-	http.Error(w, err.Error(), http.StatusNotFound)
+	http.Error(w, "", http.StatusNotFound)
 }

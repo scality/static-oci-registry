@@ -208,8 +208,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 
-				// TODO: do we really want to return data from internal errors here ?
-				Expect(body).NotTo(BeEmpty(), string(body))
+				Expect(body).To(BeEmpty(), string(body))
 			})
 		})
 
@@ -228,8 +227,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 
-				// TODO: do we really want to return data from internal errors here ?
-				Expect(body).NotTo(BeEmpty(), string(body))
+				Expect(body).To(BeEmpty(), string(body))
 			})
 		})
 
@@ -243,8 +241,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 
-				// TODO: do we really want to return data from internal errors here ?
-				Expect(body).NotTo(BeEmpty(), string(body))
+				Expect(body).To(BeEmpty(), string(body))
 
 				os.Chmod(suite.FsRoot+"/find-images-solution-baddir", 0o700)
 				os.RemoveAll(suite.FsRoot + "/find-images-solution-baddir")
@@ -261,8 +258,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 
-				// TODO: do we really want to return data from internal errors here ?
-				Expect(body).NotTo(BeEmpty(), string(body))
+				Expect(body).To(BeEmpty(), string(body))
 			})
 		})
 
