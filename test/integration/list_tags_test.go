@@ -23,35 +23,34 @@ func checkListTagsOutput(body []byte, name string, tags []string) {
 	Expect(output.Name).To(BeEquivalentTo(name))
 
 	// check len and elements - tags param should have unique values
-	Expect(len(output.Tags)).To(Equal(len(tags)))
+	Expect(output.Tags).To(HaveLen(len(tags)))
+
 	for _, tag := range tags {
 		Expect(output.Tags).To(ContainElement(BeEquivalentTo(tag)))
 	}
 }
 
 var _ = Describe("List Tags Integration", Ordered, func() {
-
 	var client *http.Client
 
-	BeforeEach(func(){
+	BeforeEach(func() {
 		client = &http.Client{
 			Timeout: timeoutDurationInSeconds * time.Second,
 		}
 	})
 
 	Context("Listing tags via HTTP in a healthy FS", Ordered, func() {
-
-		var solution string = "list-tags-solution"
+		solution := "list-tags-solution"
 		var image domain.ImageName = "docker.io/library/alpine"
-		var tags []string = []string{"3.21.0", "3.22.0", "3.22.1", "3.22.2"}
+		tags := []string{"3.21.0", "3.22.0", "3.22.1", "3.22.2"}
 
 		BeforeAll(func() {
 			for _, tag := range tags {
 				suite.FetchImage(&utils.RegistryEntry{
 					Solution: solution,
-					Version: "v1.0.0",
-					Image: image,
-					Tag: tag,
+					Version:  "v1.0.0",
+					Image:    image,
+					Tag:      tag,
 				})
 			}
 		})
@@ -79,9 +78,9 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 				n = min(n, len(tags))
 				checkListTagsOutput(body, string(image), tags[:n])
 			},
-			Entry("get no tags", 0),
-			Entry("get partial tags", 2),
-			Entry("get all tags", 500),
+				Entry("get no tags", 0),
+				Entry("get partial tags", 2),
+				Entry("get all tags", 500),
 			)
 		})
 
@@ -96,9 +95,9 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 				n := slices.Index(tags, last)
 				checkListTagsOutput(body, string(image), tags[n+1:])
 			},
-			Entry("get all tags", "3.21.0"),
-			Entry("get partial tags", "3.22.0"),
-			Entry("get no tags", "3.22.2"),
+				Entry("get all tags", "3.21.0"),
+				Entry("get partial tags", "3.22.0"),
+				Entry("get no tags", "3.22.2"),
 			)
 		})
 
@@ -148,10 +147,10 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				checkErrorResponse(body, ocierrors.Unsupported)
 			},
-			// here we use string to allow non-integer values
-			Entry("negative n", "-1"),
-			Entry("vey big n", "1000000"),
-			Entry("non integer n", "abc"),
+				// here we use string to allow non-integer values
+				Entry("negative n", "-1"),
+				Entry("vey big n", "1000000"),
+				Entry("non integer n", "abc"),
 			)
 		})
 
@@ -165,8 +164,8 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				checkErrorResponse(body, ocierrors.Unsupported)
 			},
-			Entry("invalid tag", "==invalid"),
-			Entry("non-existing tag", "3.333"),
+				Entry("invalid tag", "==invalid"),
+				Entry("non-existing tag", "3.333"),
 			)
 		})
 
@@ -174,17 +173,15 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 			for _, tag := range tags {
 				suite.ClearImage(&utils.RegistryEntry{
 					Solution: solution,
-					Version: "v1.0.0",
-					Image: image,
-					Tag: tag,
+					Version:  "v1.0.0",
+					Image:    image,
+					Tag:      tag,
 				})
 			}
 		})
-
 	})
 
 	Context("Listing tags via HTTP in an unhealthy FS", Ordered, func() {
-
 		var re *utils.RegistryEntry
 
 		BeforeAll(func() {
@@ -200,7 +197,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 			It("should return a 500 error", func() {
 				suite.FetchImage(re)
 
-				os.Chmod(re.ImagePath(suite.FsRoot), 0o300)
+				os.Chmod(re.ImagePath(suite.FsRoot), utils.PermissionNoRead)
 
 				req := initRequest(string(re.Image), "/tags/list", nil)
 
@@ -219,7 +216,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 				// copy the struct by dereferencing the pointer so we don't change the original
 				rebad := *re
 				rebad.Version = "v9.9.9"
-				os.MkdirAll(rebad.ImagePath(suite.FsRoot), 0o000)
+				os.MkdirAll(rebad.ImagePath(suite.FsRoot), utils.PermissionNone)
 
 				req := initRequest(string(re.Image), "/tags/list", nil)
 
@@ -233,7 +230,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 		When("a solution directory is not readable", func() {
 			It("should return a 500 error", func() {
-				os.MkdirAll(suite.FsRoot+"/find-images-solution-baddir", 0o300)
+				os.MkdirAll(suite.FsRoot+"/find-images-solution-baddir", utils.PermissionNoRead)
 
 				req := initRequest(string(re.Image), "/tags/list", nil)
 
@@ -243,14 +240,14 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				Expect(body).To(BeEmpty(), string(body))
 
-				os.Chmod(suite.FsRoot+"/find-images-solution-baddir", 0o700)
+				os.Chmod(suite.FsRoot+"/find-images-solution-baddir", utils.PermissionOK)
 				os.RemoveAll(suite.FsRoot + "/find-images-solution-baddir")
 			})
 		})
 
 		When("the FS root is not readable", func() {
 			It("should return a 500 error", func() {
-				os.Chmod(suite.FsRoot, 0o300)
+				os.Chmod(suite.FsRoot, utils.PermissionNoRead)
 
 				req := initRequest(string(re.Image), "/tags/list", nil)
 
@@ -264,9 +261,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 		AfterEach(func() {
 			suite.ClearImage(re)
-			os.Chmod(suite.FsRoot, 0o700)
+			os.Chmod(suite.FsRoot, utils.PermissionOK)
 		})
-
 	})
-
 })

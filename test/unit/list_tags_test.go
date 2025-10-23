@@ -79,7 +79,7 @@ var _ = Describe("List Tags", Ordered, func() {
 			When("Listing tags for an existing image with bad permissions", func() {
 				It("should return an internal error", func() {
 					suite.FetchImage(re)
-					os.Chmod(re.ImagePath(suite.FsRoot), 0o300)
+					os.Chmod(re.ImagePath(suite.FsRoot), utils.PermissionNoRead)
 
 					_, err := tagLister.ListTags(re.Image)
 					Expect(err).To(HaveOccurred())

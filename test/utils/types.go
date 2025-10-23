@@ -1,15 +1,23 @@
+// nolint: revive // var-naming: this is okay, test utils is straight forward
 package utils
 
 import (
 	"os"
 	"os/exec"
 
+	// nolint: revive,staticcheck // only gomega and ginkgo are to be used as dot imports
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/scality/static-oci-registry/pkg/domain"
 	apperrors "github.com/scality/static-oci-registry/pkg/errors"
+)
+
+const (
+	PermissionOK     os.FileMode = 0o700
+	PermissionNoRead os.FileMode = 0o300
+	PermissionNone   os.FileMode = 0o000
 )
 
 type (
@@ -63,7 +71,7 @@ func NewTestSuite(name string) *TestSuite {
 	return suite
 }
 
-// in case we want to use another logger
+// in case we want to use another logger.
 func NewTestSuiteNoLogger(name string) *TestSuite {
 	suite := &TestSuite{Name: name}
 
@@ -73,8 +81,9 @@ func NewTestSuiteNoLogger(name string) *TestSuite {
 }
 
 func (s *TestSuite) InitFsRoot() {
-	tmpdir, err := os.MkdirTemp("/tmp", "test-static-oci-registry-" + s.Name + "-*")
+	tmpdir, err := os.MkdirTemp("/tmp", "test-static-oci-registry-"+s.Name+"-*")
 	Expect(err).NotTo(HaveOccurred())
+
 	s.FsRoot = tmpdir
 }
 
@@ -85,6 +94,7 @@ func (s *TestSuite) CleanupFsRoot() {
 		Expect(os.RemoveAll(s.FsRoot)).To(Succeed())
 		return
 	}
+
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -96,7 +106,7 @@ func (s *TestSuite) InitLogger() {
 
 func (s *TestSuite) FetchImage(re *RegistryEntry) {
 	// create dirs and files as needed
-	os.MkdirAll(re.ImagePath(s.FsRoot), 0o700)
+	Expect(os.MkdirAll(re.ImagePath(s.FsRoot), PermissionOK)).To(Succeed())
 
 	// get DOCKER_HOST env var, or use default if not set
 	dockerHost := os.Getenv("DOCKER_HOST")
@@ -105,6 +115,7 @@ func (s *TestSuite) FetchImage(re *RegistryEntry) {
 	}
 
 	// docker build ../../test.Dockerfile --build-arg VERSION=re.Tag -t test-image:re.Tag .
+	// nolint: gosec // G204: this is acceptable since it's for tests only
 	buildCmd := exec.Command(
 		"docker", "build",
 		"-f", "../target.Dockerfile",
@@ -114,7 +125,8 @@ func (s *TestSuite) FetchImage(re *RegistryEntry) {
 	)
 	Expect(buildCmd.Run()).To(Succeed())
 
-	// skopeo copy with flags: --format v2s2 --dest-compress --src-daemon-host <<DOCKER_HOST>> --insecure-policy
+	// skopeo copy with flags:
+	// --format v2s2 --dest-compress --src-daemon-host <<DOCKER_HOST>> --insecure-policy
 	skopeoArgs := []string{
 		"copy",
 		"--format", "v2s2",
@@ -124,7 +136,9 @@ func (s *TestSuite) FetchImage(re *RegistryEntry) {
 		"docker-daemon:test-image:" + re.Tag,
 		"dir:" + re.FullPath(s.FsRoot),
 	}
+	// nolint: gosec // G204: this is acceptable since it's for tests only
 	cmd := exec.Command("skopeo", skopeoArgs...)
+
 	cmd.Env = append(os.Environ(), "DOCKER_HOST="+dockerHost)
 
 	Expect(cmd.Run()).To(Succeed())
@@ -134,8 +148,8 @@ func (s *TestSuite) ClearImage(re *RegistryEntry) {
 	targetDir := re.ImagePath(s.FsRoot)
 	// remove the image dir
 	_, err := os.Stat(targetDir)
-	if !os.IsNotExist(err) || err == nil {
-		os.Chmod(targetDir, 0o700)
+	if err == nil || !os.IsNotExist(err) {
+		Expect(os.Chmod(targetDir, PermissionOK)).To(Succeed())
 		Expect(os.RemoveAll(targetDir)).To(Succeed())
 	}
 }

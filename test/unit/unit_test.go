@@ -3,6 +3,7 @@ package unit
 import (
 	"testing"
 
+	// nolint: revive,staticcheck // only gomega and ginkgo are to be used as dot imports
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/scality/static-oci-registry/test/utils"

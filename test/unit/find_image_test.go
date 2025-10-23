@@ -61,7 +61,7 @@ var _ = Describe("Find Images", Ordered, func() {
 				// copy the struct by dereferencing the pointer so we don't change the original
 				rebad := *re
 				rebad.Version = "v9.9.9"
-				os.MkdirAll(rebad.ImagePath(suite.FsRoot), 0o000)
+				os.MkdirAll(rebad.ImagePath(suite.FsRoot), utils.PermissionNone)
 
 				_, err := imageFinder.FindImage(re.Image)
 
@@ -73,7 +73,7 @@ var _ = Describe("Find Images", Ordered, func() {
 
 		When("a solution directory is not readable", func() {
 			It("should return a registry internal error", func() {
-				os.MkdirAll(suite.FsRoot+"/find-images-solution-baddir", 0o300)
+				os.MkdirAll(suite.FsRoot+"/find-images-solution-baddir", utils.PermissionNoRead)
 
 				_, err := imageFinder.FindImage(re.Image)
 
@@ -81,14 +81,14 @@ var _ = Describe("Find Images", Ordered, func() {
 				utils.ValidateError(err)
 				Expect(err).To(MatchError(domain.ErrRegistryInternal))
 
-				os.Chmod(suite.FsRoot+"/find-images-solution-baddir", 0o700)
+				os.Chmod(suite.FsRoot+"/find-images-solution-baddir", utils.PermissionOK)
 				os.RemoveAll(suite.FsRoot + "/find-images-solution-baddir")
 			})
 		})
 
 		When("the FS root is not readable", func() {
 			It("should return a registry internal error", func() {
-				os.Chmod(suite.FsRoot, 0o300)
+				os.Chmod(suite.FsRoot, utils.PermissionNoRead)
 
 				_, err := imageFinder.FindImage(re.Image)
 
@@ -101,6 +101,6 @@ var _ = Describe("Find Images", Ordered, func() {
 
 	AfterEach(func() {
 		suite.ClearImage(re)
-		os.Chmod(suite.FsRoot, 0o700)
+		os.Chmod(suite.FsRoot, utils.PermissionOK)
 	})
 })

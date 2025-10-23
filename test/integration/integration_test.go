@@ -37,16 +37,18 @@ func TestIntegration(t *testing.T) {
 	RunSpecs(t, "Integration Suite")
 }
 
+// nolint: unparam // This param will have different values in the future
 func initRequest(image, path string, params QueryParams) *http.Request {
-	sanitizedImage := strings.ReplaceAll(string(image), "/", "%2F")
+	sanitizedImage := strings.ReplaceAll(image, "/", "%2F")
 	url := "http://localhost" + cfg.HTTP.Addr + "/v2/" + sanitizedImage + path
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	q := req.URL.Query()
 	for key, value := range params {
 		q.Set(key, value)
 	}
+
 	req.URL.RawQuery = q.Encode()
 
 	return req
@@ -55,6 +57,7 @@ func initRequest(image, path string, params QueryParams) *http.Request {
 func execRequest(client *http.Client, req *http.Request) (*http.Response, []byte) {
 	resp, err := client.Do(req)
 	Expect(err).NotTo(HaveOccurred())
+
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
@@ -97,7 +100,7 @@ var _ = BeforeSuite(func() {
 	// start http server
 	httpServer = container.GetHTTPServer()
 
-	go func () {
+	go func() {
 		serveErr := httpServer.ListenAndServe()
 		Expect(serveErr).To(MatchError(http.ErrServerClosed))
 	}()
@@ -106,7 +109,7 @@ var _ = BeforeSuite(func() {
 	client := &http.Client{
 		Timeout: timeoutDurationInSeconds * time.Second,
 	}
-	req, err := http.NewRequest("GET", "http://localhost"+cfg.HTTP.Addr+"/v2/", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://localhost"+cfg.HTTP.Addr+"/v2/", nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	resp, err := client.Do(req)
