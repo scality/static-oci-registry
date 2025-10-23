@@ -36,7 +36,7 @@ func (e *Error) Wrapf(format string, args ...any) *Error {
 }
 
 func (e *Error) WrapErr(cause error) *Error {
-	return e.Wrapf("%v", cause)
+	return e.Wrapf("caused by: %v", cause)
 }
 
 func AsOCIError(err error) (*ocierrors.OCIError, bool) {

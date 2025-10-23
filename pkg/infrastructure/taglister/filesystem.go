@@ -35,8 +35,10 @@ func NewFileSystem(
 		return nil, errors.New("passed FS_ROOT is not a directory")
 	}
 
+	logger := l.With().Str("taglister", "filesystem").Logger()
+
 	return &FileSystem{
-		logger:      l,
+		logger:      &logger,
 		imageFinder: i,
 		fsRoot:      r,
 	}, nil
@@ -78,13 +80,14 @@ func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutp
 			// make sure this directory contains a manifest.json file
 			manifestPath := dir + "/" + entry.Name() + "/manifest.json"
 			if info, err := os.Stat(manifestPath); err != nil || info.IsDir() {
-				// we don't pollute the logs in this case
-				// since it could be an intermediary directory
+				l.Warn().Str("location", dir).Str("tag", entry.Name()).
+					Msg("location/tag directory does not contain manifest.json file")
+
 				continue
 			}
 
 			tag := domain.Tag(entry.Name())
-			tl := l.With().Str("tag", string(tag)).Logger()
+			tl := l.With().Str("location", dir).Str("tag", string(tag)).Logger()
 
 			err := tag.Validate()
 			if err != nil {

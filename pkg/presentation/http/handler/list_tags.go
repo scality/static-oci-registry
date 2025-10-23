@@ -33,7 +33,7 @@ func NewListTags(
 // nolint:funlen // this function is long because of all the checks and cannot be
 // meaningfully shortened or split
 // parses a query and return the input type for ListTags usecase.
-func parseQuery(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
+func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 	img := domain.ImageName(r.PathValue("image"))
 
 	err := img.Validate()
@@ -91,7 +91,7 @@ func parseQuery(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 }
 
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	listTagsInput, err := parseQuery(r)
+	listTagsInput, err := parseRequest(r)
 	if err != nil {
 		httplayer.HandleError(w, err, h.logger)
 		return
