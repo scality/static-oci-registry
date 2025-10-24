@@ -114,11 +114,16 @@ func (s *TestSuite) FetchImage(re *RegistryEntry) {
 		dockerHost = "unix:///var/run/docker.sock"
 	}
 
-	// docker build ../../test.Dockerfile --build-arg VERSION=re.Tag -t test-image:re.Tag .
+	targetDockerfile := os.Getenv("TARGET_DOCKERFILE")
+	Expect(targetDockerfile).NotTo(BeEmpty(),
+		"TARGET_DOCKERFILE env var must be set to the path",
+		" of the Dockerfile to build the test image")
+
+	// docker build ../test.Dockerfile --build-arg VERSION=re.Tag -t test-image:re.Tag .
 	// nolint: gosec // G204: this is acceptable since it's for tests only
 	buildCmd := exec.Command(
 		"docker", "build",
-		"-f", "../target.Dockerfile",
+		"-f", targetDockerfile,
 		"--build-arg", "VERSION="+re.Tag,
 		"-t", "test-image:"+re.Tag,
 		".",

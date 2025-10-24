@@ -105,6 +105,13 @@ var _ = BeforeSuite(func() {
 		Expect(serveErr).To(MatchError(http.ErrServerClosed))
 	}()
 
+	Expect(
+		waitForServer(
+			"http://localhost"+cfg.HTTP.Addr+"/v2/",
+			timeoutDurationInSeconds*time.Second,
+		),
+	).To(BeTrue())
+
 	// maybe wait for server to be ready
 	client := &http.Client{
 		Timeout: timeoutDurationInSeconds * time.Second,
@@ -127,3 +134,17 @@ var _ = AfterSuite(func() {
 	err := httpServer.Shutdown(ctx)
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func waitForServer(url string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(url)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			return true
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return false
+}

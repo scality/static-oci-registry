@@ -1,0 +1,27 @@
+name: 'Setup GO Environment'
+description: 'Configure GO, GOPATH, and install ginkgo'
+
+runs:
+  using: "composite"
+  steps:
+
+  - name: Set up Go
+    uses: actions/setup-go@v6
+    with:
+      go-version-file: go.mod
+
+  - name: Download Go modules
+    shell: bash
+    run: go mod download
+
+  - name: Verify Go modules
+    shell: bash
+    run: go mod verify
+
+  - name: Install Ginkgo
+    shell: bash
+    run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+  - name: Add GOPATH/bin to PATH
+    shell: bash
+    run: echo "${GOPATH:-$HOME/go}/bin" >> $GITHUB_PATH
