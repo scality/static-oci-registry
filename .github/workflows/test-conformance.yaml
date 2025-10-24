@@ -1,0 +1,48 @@
+name: OCI Conformance Tests
+
+on:
+  workflow_call:
+
+jobs:
+  conformance-test:
+    name: Run on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: clone the repo
+        uses: actions/checkout@v4
+      # run make testfs to replicate a testfs
+      - name: make test filesystem
+        run: |
+          make testfs
+      # run make build to build the app
+      - name: build the registry binary
+        run: |
+          go mod tidy
+          make binary-build
+      # start the app
+      - name: start the app
+        run: |
+          ./_build/static-oci-registry &
+          echo $! > app.pid
+        env:
+          FS_ROOT: _testfs
+      # run the opencontainers distribution spec action
+      - name: Run OCI Distribution Spec conformance test suite
+        uses: opencontainers/distribution-spec@v1.1.1
+        env:
+          OCI_ROOT_URL: http://localhost:5000
+          OCI_NAMESPACE: docker.io/library/alpine
+          # OCI_USERNAME: ${{ secrets.MY_REGISTRY_USERNAME }}
+          # OCI_PASSWORD: ${{ secrets.MY_REGISTRY_PASSWORD }}
+          OCI_TEST_PULL: 0
+          OCI_TEST_PUSH: 0
+          OCI_TEST_CONTENT_DISCOVERY: 1
+          OCI_TEST_CONTENT_MANAGEMENT: 0
+          OCI_HIDE_SKIPPED_WORKFLOWS: 1
+          OCI_DEBUG: 0
+          OCI_DELETE_MANIFEST_BEFORE_BLOBS: 0
+          # this param will be necessary because we don't support push
+          OCI_TAG_LIST: "3.19,3.20,3.21,3.22"
+      - name: stop the app
+        run: |
+          kill $(cat app.pid)

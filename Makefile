@@ -1,22 +1,24 @@
+IMAGES := \
+  'my-solution v1.0.0 docker.io/library/alpine 3.19' \
+  'my-solution v2.0.0 docker.io/library/alpine 3.20' \
+  'my-solution v3.0.0-rc1 docker.io/library/alpine 3.21' \
+  'my-solution v4.5.0 docker.io/library/alpine 3.22'
+
 DOCKER_HOST ?= unix:///var/run/docker.sock
 SKOPEO ?= skopeo
 SKOPEO_FLAGS ?= --format v2s2 --dest-compress --src-daemon-host $(DOCKER_HOST) --insecure-policy
 
-# build: build docker image and tag it as static-oci-registy:latest
+TEST_DOCKERFILE ?= ./test/target.Dockerfile
+
+.PHONY: build
 build:
 	docker build -t static-oci-registry:latest .
-.PHONY: build
 
-IMAGES := \
-  'my-solution v1.0.0 docker.io/library/postgres 9' \
-  'my-solution v2.0.1-rc.1 docker.io/library/postgres 13' \
-  'my-solution v2.0.1 docker.io/library/postgres 16' \
-  'my-solution 2.5.8-beta.1 docker.io/library/postgres 17' \
-  'my-solution 3.0.9-pw.1 docker.io/library/postgres 18' \
-  'another-solution 1.0 docker.io/library/alpine 3.17' \
-  'another-solution 2.0 docker.io/library/alpine 3.21' \
-  'another-solution 2.7 docker.io/library/alpine 3.22'
+.PHONY: build-binary
+build-binary:
+	go build -o _build/static-oci-registry ./cmd/main.go
 
+.PHONY: testfs
 testfs: clean
 	mkdir -p _testfs
 	for img in $(IMAGES); do \
@@ -30,5 +32,14 @@ testfs: clean
 		$(SKOPEO) copy $(SKOPEO_FLAGS) docker-daemon:test-image:$$tag dir:_testfs/$$solution/$$version/$$image/$$tag; \
 	done > /dev/null
 
+.PHONY: clean
 clean:
 	rm -rf _testfs
+
+.PHONY: unit-test
+unit-test:
+	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo test/unit
+
+.PHONY: integration-test
+integration-test:
+	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo test/integration
