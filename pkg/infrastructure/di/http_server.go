@@ -11,7 +11,7 @@ func (c *Container) GetHTTPServer() *http.Server {
 	if c.httpServer == nil {
 		c.httpServer = &http.Server{
 			Addr:              c.config.HTTP.Addr,
-			Handler:           c.getRouter(),
+			Handler:           c.getHTTPRouter(),
 			ReadHeaderTimeout: timeoutDurationInSeconds * time.Second,
 		}
 	}

@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	prefix = "/v2/"
-	suffix = "/tags/list"
+	listTagsPrefix = "/v2/"
+	listTagsSuffix = "/tags/list"
 )
 
 type ListTags struct {
@@ -35,6 +35,22 @@ func NewListTags(
 	}
 }
 
+func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	listTagsInput, err := parseRequest(r)
+	if err != nil {
+		httplayer.HandleError(w, err, h.logger)
+		return
+	}
+
+	listTagsOutput, err := h.listTagsUseCase.Execute(*listTagsInput)
+	if err != nil {
+		httplayer.HandleError(w, err, h.logger)
+		return
+	}
+
+	httplayer.RespondWithJSON(w, listTagsOutput, http.StatusOK, h.logger)
+}
+
 // nolint:funlen,gocognit // this function is long and complex because of all the
 // checks and path parsing logic, and cannot be meaningfully shortened or split
 // parses a query and return the input type for ListTags usecase.
@@ -45,8 +61,8 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 	path := r.URL.Path
 
 	img := domain.ImageName("")
-	if len(path) > len(prefix)+len(suffix) {
-		img = domain.ImageName(path[len(prefix) : len(path)-len(suffix)])
+	if len(path) > len(listTagsPrefix)+len(listTagsSuffix) {
+		img = domain.ImageName(path[len(listTagsPrefix) : len(path)-len(listTagsSuffix)])
 	}
 
 	err := img.Validate()
@@ -101,20 +117,4 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 	}
 
 	return listTagsInput, nil
-}
-
-func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	listTagsInput, err := parseRequest(r)
-	if err != nil {
-		httplayer.HandleError(w, err, h.logger)
-		return
-	}
-
-	listTagsOutput, err := h.listTagsUseCase.Execute(*listTagsInput)
-	if err != nil {
-		httplayer.HandleError(w, err, h.logger)
-		return
-	}
-
-	httplayer.RespondWithJSON(w, listTagsOutput, http.StatusOK, h.logger)
 }
