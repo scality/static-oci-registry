@@ -21,6 +21,8 @@ type Container struct {
 
 	logger *zerolog.Logger
 
+	router http.Handler
+
 	httpServer *http.Server
 
 	listTagsHandler *handler.ListTags

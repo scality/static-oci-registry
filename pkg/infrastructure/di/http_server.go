@@ -9,29 +9,9 @@ const timeoutDurationInSeconds = 5
 
 func (c *Container) GetHTTPServer() *http.Server {
 	if c.httpServer == nil {
-		router := http.NewServeMux()
-
-		// Healthcheck endpoint for liveness status
-		router.HandleFunc("/healthz", func(writer http.ResponseWriter, _ *http.Request) {
-			writer.WriteHeader(http.StatusOK)
-		})
-
-		// Healthcheck endpoint for kubernetes startup probe
-		router.HandleFunc("/readyz", func(writer http.ResponseWriter, _ *http.Request) {
-			writer.WriteHeader(http.StatusOK)
-		})
-
-		// OCI healthcheck endpoint (end-1 of the spec)
-		router.HandleFunc("/v2/", func(writer http.ResponseWriter, _ *http.Request) {
-			writer.WriteHeader(http.StatusOK)
-		})
-
-		// OCI tag list endpoint (end-8a and 8b of the spec)
-		router.Handle("/v2/{image}/tags/list", c.getListTagsHandler())
-
 		c.httpServer = &http.Server{
 			Addr:              c.config.HTTP.Addr,
-			Handler:           router,
+			Handler:           c.getRouter(),
 			ReadHeaderTimeout: timeoutDurationInSeconds * time.Second,
 		}
 	}

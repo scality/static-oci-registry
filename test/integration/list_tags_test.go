@@ -56,8 +56,21 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 		})
 
 		When("using an existing image", func() {
-			It("should return the correct tags", func() {
+			It("should return the correct tags with URL-encoded slashes", func() {
 				req := initRequest(string(image), "/tags/list", nil)
+
+				resp, body := execRequest(client, req)
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				checkListTagsOutput(body, string(image), tags)
+			})
+
+			It("should return the correct tags with unencoded slashes", func() {
+				// Test with unencoded slashes in the URL path
+				url := "http://localhost" + cfg.HTTP.Addr + "/v2/" + string(image) + "/tags/list"
+				req, err := http.NewRequest(http.MethodGet, url, nil)
+				Expect(err).NotTo(HaveOccurred())
 
 				resp, body := execRequest(client, req)
 

@@ -13,6 +13,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	prefix = "/v2/"
+	suffix = "/tags/list"
+)
+
 type ListTags struct {
 	logger          *zerolog.Logger
 	listTagsUseCase *usecase.ListTags
@@ -30,11 +35,19 @@ func NewListTags(
 	}
 }
 
-// nolint:funlen // this function is long because of all the checks and cannot be
-// meaningfully shortened or split
+// nolint:funlen,gocognit // this function is long and complex because of all the
+// checks and path parsing logic, and cannot be meaningfully shortened or split
 // parses a query and return the input type for ListTags usecase.
 func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
-	img := domain.ImageName(r.PathValue("image"))
+	// Extract image name from URL path
+	// Path format: /v2/{image}/tags/list
+	// We use manual path parsing to support multi-level image names with slashes
+	path := r.URL.Path
+
+	img := domain.ImageName("")
+	if len(path) > len(prefix)+len(suffix) {
+		img = domain.ImageName(path[len(prefix) : len(path)-len(suffix)])
+	}
 
 	err := img.Validate()
 	if err != nil {
