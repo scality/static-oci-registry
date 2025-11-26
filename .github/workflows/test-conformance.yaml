@@ -1,0 +1,73 @@
+name: OCI Conformance Tests
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        required: true
+        type: string
+
+jobs:
+  conformance-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: clone the repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            test/target.Dockerfile
+            Makefile
+
+      # run make testfs to replicate a testfs
+      - name: make test filesystem
+        env:
+          TEST_DIR: ${{ github.workspace }}/_testfs
+        run: |
+          make testfs && mv $TEST_DIR/* .
+
+      - name: clean unneeded files
+        run: |
+          rm -rf Makefile test/target.Dockerfile
+
+      # Wait for registry to be up
+      - name: Wait for the registry to be up
+        run: |
+          for i in {1..10}; do
+            if curl -sf http://localhost:5000/v2/; then
+              echo "Registry is up!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Registry did not start in time." >&2
+          exit 1
+
+      # run the opencontainers distribution spec action
+      # ignore the result for now, since listing references is not yet implemented
+      - name: Run OCI Distribution Spec conformance test suite
+        continue-on-error: true
+        uses: opencontainers/distribution-spec@v1.1.1
+        env:
+          OCI_ROOT_URL: http://localhost:5000
+          OCI_NAMESPACE: docker.io/library/alpine
+          # OCI_USERNAME: ${{ secrets.MY_REGISTRY_USERNAME }}
+          # OCI_PASSWORD: ${{ secrets.MY_REGISTRY_PASSWORD }}
+          OCI_TEST_PULL: 0
+          OCI_TEST_PUSH: 0
+          OCI_TEST_CONTENT_DISCOVERY: 1
+          OCI_TEST_CONTENT_MANAGEMENT: 0
+          OCI_HIDE_SKIPPED_WORKFLOWS: 1
+          OCI_DEBUG: 0
+          OCI_DELETE_MANIFEST_BEFORE_BLOBS: 0
+          # this param will be necessary because we don't support push
+          OCI_TAG_LIST: "3.19,3.20,3.21,3.22"
+
+    services:
+      registry:
+        image: ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+        env:
+          FS_ROOT: /data
+        ports:
+          - 5000:5000
+        options: >-
+          --mount type=bind,source=${{ github.workspace }},target=/data

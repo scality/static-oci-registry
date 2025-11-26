@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"static-oci-registry/cmd/config"
-	"static-oci-registry/pkg/infrastructure/di"
 	"syscall"
 	"time"
+
+	"github.com/scality/static-oci-registry/cmd/config"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/di"
 )
 
 const timeoutDurationInSeconds = 5

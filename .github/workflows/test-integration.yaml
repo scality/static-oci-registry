@@ -1,0 +1,17 @@
+name: Integration tests
+
+on:
+  workflow_call:
+
+jobs:
+  integration-test:
+    name: Run on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: clone the repo
+        uses: actions/checkout@v4
+      - name: set up go
+        uses: ./.github/actions/setup-go
+      - name: Run Tests
+        run: |
+          make integration-test

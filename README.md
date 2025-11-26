@@ -5,15 +5,17 @@ for Pull and Discovery. Written in Go.
 
 ## Endpoints
 
-| Method         | API Endpoint | Success     | Failure           |
-| -------------- | ------------ | ----------- | ----------------- |
-| `GET`          | `/v2/`       | `200`       | `404`/`401`       |
+| Method         | API Endpoint           | Success     | Failure           | Params  |
+| -------------- | ---------------------- | ----------- | ----------------- | ------- |
+| `GET`          | `/v2/`                 | `200`       | `404`/`401`       |         |
+| `GET`          | `/v2/<name>/tags/list` | `200`       | `404`             | n, last |
 
 ## Environment variables
 
 This service can be configured through environment variables:
 
-| Variable  | Behaviour                                                        |
-| --------- | ---------------------------------------------------------------- |
-| LOG_LEVEL | Sets the log level for the service                               |
-| HTTP_ADDR | Sets the address the service listens and serves HTTP requests on |
+| Variable  | Behaviour                                                         |
+| --------- | ----------------------------------------------------------------- |
+| LOG_LEVEL | Sets the log level for the service                                |
+| HTTP_ADDR | Sets the address the service listens and serves HTTP requests on  |
+| FS_ROOT   | Sets the path to the root filesystem that the registry reads from |

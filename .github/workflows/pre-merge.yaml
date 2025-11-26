@@ -47,3 +47,18 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.5.0
+
+  test-unit:
+    uses: ./.github/workflows/test-unit.yaml
+    secrets: inherit
+
+  test-integration:
+    uses: ./.github/workflows/test-integration.yaml
+    secrets: inherit
+
+  test-conformance:
+    needs: build
+    uses: ./.github/workflows/test-conformance.yaml
+    secrets: inherit
+    with:
+      image_tag: ${{ needs.build.outputs.image_tag }}

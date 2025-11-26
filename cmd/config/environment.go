@@ -25,9 +25,13 @@ type (
 	Environment struct {
 		LogLevel string `env:"LOG_LEVEL, default=info"`
 		HTTP     HTTP   `env:",prefix=HTTP_"`
+		FS       FS     `env:",prefix=FS_"`
 	}
 	HTTP struct {
-		Addr string `env:"ADDR, default=:8080"`
+		Addr string `env:"ADDR, default=:5000"`
+	}
+	FS struct {
+		Root string `env:"ROOT, default=/data"`
 	}
 )
 

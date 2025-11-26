@@ -17,6 +17,11 @@ follows this hierarchy:
         4.2.0/
 ```
 
+> [!NOTE]
+> In this implementations, the versions numbers are interpreted using SemVer for sorting.
+> In order to have a properly functioning sort algorithm, it is strongly advised to use
+> [valid semver](https://semver.org) version numbers in all solutions
+
 When an image `image1` from solution `mysolution` is requested, using reference `myregistry.lan/mysolution/image1:v1.2`
 then the registry should iterate over every version sub-directory of `<solutions>/mysolution/` until it finds
 one that contains the requested image.
