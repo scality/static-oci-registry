@@ -38,12 +38,14 @@ func GenerateSelfSignedCert(dir string) (certFile, keyFile string) {
 
 	certOut, err := os.Create(certFile)
 	Expect(err).NotTo(HaveOccurred())
+
 	defer certOut.Close()
 
 	Expect(pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})).To(Succeed())
 
 	keyOut, err := os.Create(keyFile)
 	Expect(err).NotTo(HaveOccurred())
+
 	defer keyOut.Close()
 
 	keyDER, err := x509.MarshalECPrivateKey(key)

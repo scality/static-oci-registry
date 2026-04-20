@@ -45,7 +45,9 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 	Context("Listing tags via HTTPS in a healthy FS", Ordered, func() {
 		solution := "list-tags-solution"
+
 		var image domain.ImageName = "docker.io/library/alpine"
+
 		tags := []string{"3.21.0", "3.22.0", "3.22.1", "3.22.2"}
 
 		BeforeAll(func() {

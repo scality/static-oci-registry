@@ -12,8 +12,10 @@ import (
 )
 
 var _ = Describe("Find Images", Ordered, func() {
-	var imageFinder *imagefinder.FileSystem
-	var re *utils.RegistryEntry
+	var (
+		imageFinder *imagefinder.FileSystem
+		re          *utils.RegistryEntry
+	)
 
 	BeforeAll(func() {
 		re = &utils.RegistryEntry{
@@ -24,6 +26,7 @@ var _ = Describe("Find Images", Ordered, func() {
 		}
 
 		var err error
+
 		imageFinder, err = imagefinder.NewFileSystem(suite.Logger, suite.FsRoot)
 		Expect(err).NotTo(HaveOccurred())
 	})
