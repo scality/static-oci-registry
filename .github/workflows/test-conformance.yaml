@@ -42,25 +42,35 @@ jobs:
           echo "Registry did not start in time." >&2
           exit 1
 
-      # run the opencontainers distribution spec action
-      # ignore the result for now, since listing references is not yet implemented
+      # Run the conformance container directly to control --network host,
+      # since the v1.0 action uses docker but doesn't expose that flag.
       - name: Run OCI Distribution Spec conformance test suite
-        continue-on-error: true
-        uses: opencontainers/distribution-spec@v1.1.1
-        env:
-          OCI_ROOT_URL: http://localhost:5000
-          OCI_NAMESPACE: docker.io/library/alpine
-          # OCI_USERNAME: ${{ secrets.MY_REGISTRY_USERNAME }}
-          # OCI_PASSWORD: ${{ secrets.MY_REGISTRY_PASSWORD }}
-          OCI_TEST_PULL: 0
-          OCI_TEST_PUSH: 0
-          OCI_TEST_CONTENT_DISCOVERY: 1
-          OCI_TEST_CONTENT_MANAGEMENT: 0
-          OCI_HIDE_SKIPPED_WORKFLOWS: 1
-          OCI_DEBUG: 0
-          OCI_DELETE_MANIFEST_BEFORE_BLOBS: 0
-          # this param will be necessary because we don't support push
-          OCI_TAG_LIST: "3.19,3.20,3.21,3.22"
+        # continue-on-error: true
+        run: |
+          mkdir -p ${{ github.workspace }}/conformance-results
+          docker run --rm --network host \
+            -v ${{ github.workspace }}/conformance-results:/results \
+            -w /results \
+            -e OCI_ROOT_URL=http://localhost:5000 \
+            -e OCI_NAMESPACE=docker.io/library/alpine \
+            -e OCI_TEST_PULL=0 \
+            -e OCI_TEST_PUSH=0 \
+            -e OCI_TEST_CONTENT_DISCOVERY=1 \
+            -e OCI_TEST_CONTENT_MANAGEMENT=0 \
+            -e OCI_HIDE_SKIPPED_WORKFLOWS=1 \
+            -e OCI_DEBUG=0 \
+            -e OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 \
+            -e OCI_TAG_LIST="3.19,3.20,3.21,3.22" \
+            ghcr.io/opencontainers/distribution-spec/conformance:v1.0.0-rc2@sha256:2f0ced454ce31793cc69d48a05233ea76f2ebe791936d053342b66388a6de260
+
+      - name: Upload conformance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oci-distribution-spec-conformance-results
+          path: |
+            ${{ github.workspace }}/conformance-results/report.html
+            ${{ github.workspace }}/conformance-results/junit.xml
 
     services:
       registry:
