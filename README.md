@@ -1,6 +1,6 @@
 # Static Container Registy
 
-A container registry implementation that respects [OCI spec](https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md)
+A container registry implementation that respects [OCI spec](https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md)
 for Pull and Discovery. Written in Go.
 
 ## Endpoints
