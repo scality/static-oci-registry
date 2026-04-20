@@ -13,6 +13,7 @@ func (c *Container) GetHTTPServer() *http.Server {
 			Addr:              c.config.HTTP.Addr,
 			Handler:           c.getHTTPRouter(),
 			ReadHeaderTimeout: timeoutDurationInSeconds * time.Second,
+			TLSConfig:         c.getTLSConfig(),
 		}
 	}
 

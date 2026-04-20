@@ -29,6 +29,11 @@ type (
 	}
 	HTTP struct {
 		Addr string `env:"ADDR, default=:5000"`
+		TLS  TLS    `env:",prefix=TLS_"`
+	}
+	TLS struct {
+		CertFilePath string `env:"CERT_FILE_PATH"`
+		KeyFilePath  string `env:"KEY_FILE_PATH"`
 	}
 	FS struct {
 		Root string `env:"ROOT, default=/data"`
