@@ -5,7 +5,7 @@ import (
 )
 
 // these codes are defined in the OCI Distribution Spec
-// https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#error-codes
+// https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#error-codes
 type OCIErrorCode string
 
 const (
@@ -26,7 +26,7 @@ const (
 )
 
 // this structure is defined in the OCI distribution Spec
-// https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#error-codes
+// https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#error-codes
 type OCIError struct {
 	Code    OCIErrorCode      `json:"code"`
 	Message string            `json:"message,omitempty"`

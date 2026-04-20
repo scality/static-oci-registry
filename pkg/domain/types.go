@@ -6,7 +6,7 @@ import (
 )
 
 // these validation regular expressions are pulled from the OCI distribution spec
-// https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#workflow-categories
+// https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#workflow-categories
 const (
 	// match an image name
 	// e.g. myimage, my_image, my-image, my.image, myimage123, my_repo/myimage, my_repo.io/my_image.
@@ -38,7 +38,7 @@ type (
 	}
 
 	// this is the output format defined in the OCI distribution spec
-	// https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#listing-tags
+	// https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#listing-tags
 	ListTagsOutput struct {
 		Name ImageName `json:"name"`
 		Tags []Tag     `json:"tags"`
@@ -72,7 +72,7 @@ func (t Tag) String() string {
 // from the OCI distribution spec:
 // ` If the list is not empty, the tags MUST be in lexical order
 // (i.e. case-insensitive alphanumeric order).`
-// https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#listing-tags
+// https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#listing-tags
 func CompareTags(i, j Tag) int {
 	if strings.ToLower(string(i)) < strings.ToLower(string(j)) {
 		return -1

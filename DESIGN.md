@@ -2,7 +2,7 @@
 
 ## Goal
 The goal of the Static Registry is to provide an OCI registry that follows the Pull and Discovery
-use cases of the [OCI distribution spec](https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#endpoints).
+use cases of the [OCI distribution spec](https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#endpoints).
 
 This registry should serve using TLS the images stored in a specified filesystem path (`<solutions>`) that
 follows this hierarchy:
