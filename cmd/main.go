@@ -40,7 +40,7 @@ func main() {
 	go func() {
 		logger.Info().Msg("http server starting")
 
-		serveErr := httpServer.ListenAndServe()
+		serveErr := httpServer.ListenAndServeTLS("", "")
 		if serveErr != nil {
 			sigCh <- syscall.SIGTERM
 

@@ -23,17 +23,50 @@ jobs:
         env:
           TEST_DIR: ${{ github.workspace }}/_testfs
         run: |
-          make testfs && mv $TEST_DIR/* .
+          mkdir fs && make testfs && mv $TEST_DIR/* fs
 
       - name: clean unneeded files
         run: |
           rm -rf Makefile test/target.Dockerfile
 
+      - name: Generate TLS certificates
+        run: |
+          mkdir -p certs
+          openssl genrsa -out certs/ca.key 4096 2>/dev/null
+          openssl req -new -x509 -days 3650 -key certs/ca.key \
+            -subj "/CN=static-oci-registry-test-ca" \
+            -out certs/ca.crt 2>/dev/null
+          openssl genrsa -out certs/server.key 4096 2>/dev/null
+          openssl req -new -key certs/server.key \
+            -subj "/CN=localhost" \
+            -out certs/server.csr 2>/dev/null
+          openssl x509 -req -days 3650 -in certs/server.csr \
+            -CA certs/ca.crt -CAkey certs/ca.key -CAcreateserial \
+            -extfile <(printf "subjectAltName=DNS:localhost,IP:127.0.0.1") \
+            -out certs/server.crt 2>/dev/null
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start registry
+        run: |
+          docker run -d --name registry \
+            --mount type=bind,source=${{ github.workspace }},target=/data \
+            -e FS_ROOT=/data/fs \
+            -e HTTP_TLS_CERT_FILE_PATH=/data/certs/server.crt \
+            -e HTTP_TLS_KEY_FILE_PATH=/data/certs/server.key \
+            -p 5000:5000 \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+
       # Wait for registry to be up
       - name: Wait for the registry to be up
         run: |
           for i in {1..10}; do
-            if curl -sf http://localhost:5000/v2/; then
+            if curl -sf --cacert ${{ github.workspace }}/certs/ca.crt https://localhost:5000/v2/; then
               echo "Registry is up!"
               exit 0
             fi
@@ -50,8 +83,9 @@ jobs:
           mkdir -p ${{ github.workspace }}/conformance-results
           docker run --rm --network host \
             -v ${{ github.workspace }}/conformance-results:/results \
+            -v ${{ github.workspace }}/certs/ca.crt:/etc/ssl/certs/ca-certificates.crt \
             -w /results \
-            -e OCI_ROOT_URL=http://localhost:5000 \
+            -e OCI_ROOT_URL=https://localhost:5000 \
             -e OCI_NAMESPACE=docker.io/library/alpine \
             -e OCI_TEST_PULL=0 \
             -e OCI_TEST_PUSH=0 \
@@ -71,13 +105,3 @@ jobs:
           path: |
             ${{ github.workspace }}/conformance-results/report.html
             ${{ github.workspace }}/conformance-results/junit.xml
-
-    services:
-      registry:
-        image: ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
-        env:
-          FS_ROOT: /data
-        ports:
-          - 5000:5000
-        options: >-
-          --mount type=bind,source=${{ github.workspace }},target=/data

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -36,12 +37,17 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 	BeforeEach(func() {
 		client = &http.Client{
 			Timeout: timeoutDurationInSeconds * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // self-signed cert in tests
+			},
 		}
 	})
 
-	Context("Listing tags via HTTP in a healthy FS", Ordered, func() {
+	Context("Listing tags via HTTPS in a healthy FS", Ordered, func() {
 		solution := "list-tags-solution"
+
 		var image domain.ImageName = "docker.io/library/alpine"
+
 		tags := []string{"3.21.0", "3.22.0", "3.22.1", "3.22.2"}
 
 		BeforeAll(func() {
@@ -68,7 +74,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 			It("should return the correct tags with unencoded slashes", func() {
 				// Test with unencoded slashes in the URL path
-				url := "http://localhost" + cfg.HTTP.Addr + "/v2/" + string(image) + "/tags/list"
+				url := "https://localhost" + cfg.HTTP.Addr + "/v2/" + string(image) + "/tags/list"
 				req, err := http.NewRequest(http.MethodGet, url, nil)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -194,7 +200,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 		})
 	})
 
-	Context("Listing tags via HTTP in an unhealthy FS", Ordered, func() {
+	Context("Listing tags via HTTPS in an unhealthy FS", Ordered, func() {
 		var re *utils.RegistryEntry
 
 		BeforeAll(func() {

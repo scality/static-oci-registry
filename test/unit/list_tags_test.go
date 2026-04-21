@@ -13,9 +13,11 @@ import (
 )
 
 var _ = Describe("List Tags", Ordered, func() {
-	var mockImageFinder *imagefinder.Mock
-	var tagLister *taglister.FileSystem
-	var re *utils.RegistryEntry
+	var (
+		mockImageFinder *imagefinder.Mock
+		tagLister       *taglister.FileSystem
+		re              *utils.RegistryEntry
+	)
 
 	BeforeAll(func() {
 		re = &utils.RegistryEntry{
@@ -30,6 +32,7 @@ var _ = Describe("List Tags", Ordered, func() {
 
 		// finally, set up the tagLister
 		var err error
+
 		tagLister, err = taglister.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
 		Expect(err).NotTo(HaveOccurred())
 	})

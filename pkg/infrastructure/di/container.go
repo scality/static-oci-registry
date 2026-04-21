@@ -2,6 +2,7 @@ package di
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 
 	"github.com/scality/static-oci-registry/cmd/config"
@@ -21,8 +22,8 @@ type Container struct {
 
 	logger *zerolog.Logger
 
-	router http.Handler
-
+	TLSConfig  *tls.Config
+	router     http.Handler
 	httpServer *http.Server
 
 	listTagsHandler *handler.ListTags

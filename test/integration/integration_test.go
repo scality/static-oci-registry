@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -40,7 +41,7 @@ func TestIntegration(t *testing.T) {
 // nolint: unparam // This param will have different values in the future
 func initRequest(image, path string, params QueryParams) *http.Request {
 	sanitizedImage := strings.ReplaceAll(image, "/", "%2F")
-	url := "http://localhost" + cfg.HTTP.Addr + "/v2/" + sanitizedImage + path
+	url := "https://localhost" + cfg.HTTP.Addr + "/v2/" + sanitizedImage + path
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -84,6 +85,7 @@ var _ = BeforeSuite(func() {
 
 	// init env
 	var err error
+
 	cfg, err = config.NewEnvironment(ctx)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -91,36 +93,44 @@ var _ = BeforeSuite(func() {
 	cfg.FS.Root = suite.FsRoot
 	cfg.LogLevel = "error"
 
+	// generate a self-signed cert for TLS
+	cfg.HTTP.TLS.CertFilePath, cfg.HTTP.TLS.KeyFilePath = utils.GenerateSelfSignedCert(suite.FsRoot)
+
 	// init di containter
 	container := di.NewContainer(ctx, cfg)
 
 	// get logger from container
 	suite.Logger = container.GetLogger()
 
-	// start http server
+	// start https server
 	httpServer = container.GetHTTPServer()
 
 	go func() {
-		serveErr := httpServer.ListenAndServe()
+		serveErr := httpServer.ListenAndServeTLS("", "")
 		Expect(serveErr).To(MatchError(http.ErrServerClosed))
 	}()
 
+	insecureClient := &http.Client{
+		Timeout: timeoutDurationInSeconds * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // self-signed cert in tests
+		},
+	}
+
 	Expect(
 		waitForServer(
-			"http://localhost"+cfg.HTTP.Addr+"/v2/",
+			insecureClient,
+			"https://localhost"+cfg.HTTP.Addr+"/v2/",
 			timeoutDurationInSeconds*time.Second,
 		),
 	).To(BeTrue())
 
-	// maybe wait for server to be ready
-	client := &http.Client{
-		Timeout: timeoutDurationInSeconds * time.Second,
-	}
-	req, err := http.NewRequest(http.MethodGet, "http://localhost"+cfg.HTTP.Addr+"/v2/", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://localhost"+cfg.HTTP.Addr+"/v2/", nil)
 	Expect(err).NotTo(HaveOccurred())
 
-	resp, err := client.Do(req)
+	resp, err := insecureClient.Do(req)
 	Expect(err).NotTo(HaveOccurred())
+
 	defer resp.Body.Close()
 
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -135,10 +145,10 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-func waitForServer(url string, timeout time.Duration) bool {
+func waitForServer(client *http.Client, url string, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(url)
+		resp, err := client.Get(url)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return true
 		}
