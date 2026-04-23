@@ -40,10 +40,12 @@ testfs: clean
 clean:
 	rm -rf $(TEST_DIR)
 
+JUNIT_REPORT_DIR ?= .
+
 .PHONY: unit-test
 unit-test:
-	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo test/unit
+	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit.xml test/unit
 
 .PHONY: integration-test
 integration-test:
-	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo test/integration
+	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit.xml test/integration
