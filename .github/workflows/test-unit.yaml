@@ -14,4 +14,21 @@ jobs:
         uses: ./.github/actions/setup-go
       - name: Run Tests
         run: |
-          make unit-test
+          mkdir -p ${{ github.workspace }}/artifacts/unit-results
+          make unit-test JUNIT_REPORT_DIR=${{ github.workspace }}/artifacts/unit-results
+      - name: Generate HTML report
+        if: always()
+        run: |
+          python3 -m pip install junit2html --quiet
+          junit2html \
+            ${{ github.workspace }}/artifacts/unit-results/junit-unit.xml \
+            ${{ github.workspace }}/artifacts/unit-results/report.html
+      - name: Upload test results
+        if: always()
+        uses: scality/action-artifacts@v4
+        with:
+          method: upload
+          url: https://artifacts.scality.net
+          user: ${{ secrets.ARTIFACTS_USER }}
+          password: ${{ secrets.ARTIFACTS_PASSWORD }}
+          source: ${{ github.workspace }}/artifacts/

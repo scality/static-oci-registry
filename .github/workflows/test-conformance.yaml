@@ -80,9 +80,9 @@ jobs:
       - name: Run OCI Distribution Spec conformance test suite
         # continue-on-error: true
         run: |
-          mkdir -p ${{ github.workspace }}/conformance-results
+          mkdir -p ${{ github.workspace }}/artifacts/conformance-results
           docker run --rm --network host \
-            -v ${{ github.workspace }}/conformance-results:/results \
+            -v ${{ github.workspace }}/artifacts/conformance-results:/results \
             -v ${{ github.workspace }}/certs/ca.crt:/etc/ssl/certs/ca-certificates.crt \
             -w /results \
             -e OCI_ROOT_URL=https://localhost:5000 \
@@ -99,9 +99,10 @@ jobs:
 
       - name: Upload conformance results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: scality/action-artifacts@v4
         with:
-          name: oci-distribution-spec-conformance-results
-          path: |
-            ${{ github.workspace }}/conformance-results/report.html
-            ${{ github.workspace }}/conformance-results/junit.xml
+          method: upload
+          url: https://artifacts.scality.net
+          user: ${{ secrets.ARTIFACTS_USER }}
+          password: ${{ secrets.ARTIFACTS_PASSWORD }}
+          source: ${{ github.workspace }}/artifacts/
