@@ -11,7 +11,7 @@ import (
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
-	"github.com/scality/static-oci-registry/pkg/presentation/http"
+	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 )
 
 const (
@@ -54,7 +54,7 @@ func ValidateError(err error) {
 		return
 	}
 
-	ociErr, ok := http.AsOCIError(err) // move this somewhere useful
+	ociErr, ok := ocierrors.AsOCIError(err) // move this somewhere useful
 	// should have ociError field
 	Expect(ok).To(BeTrue())
 

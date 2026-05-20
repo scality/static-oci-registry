@@ -1,8 +1,70 @@
 package ocierrors
 
+import (
+	"strings"
+
+	"github.com/scality/go-errors"
+)
+
 // these codes are defined in the OCI Distribution Spec
 // https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#error-codes
 type OCIErrorCode string
+
+type OCIError struct {
+	Code    OCIErrorCode      `json:"code"`
+	Message string            `json:"message,omitempty"`
+	Detail  map[string]string `json:"detail,omitempty"`
+}
+
+func extractCodeAndMessage(
+	k string, v any, code OCIErrorCode, message string,
+) (OCIErrorCode, string) {
+	switch k {
+	case OCICode:
+		if val, ok := v.(OCIErrorCode); ok {
+			return val, message
+		}
+	case OCIMessage:
+		if val, ok := v.(string); ok {
+			return code, val
+		}
+	}
+
+	return code, message
+}
+
+func extractOCIProps(props map[string]any) (OCIErrorCode, string, map[string]string) {
+	var code OCIErrorCode
+
+	message := ""
+	details := make(map[string]string)
+
+	for k, v := range props {
+		code, message = extractCodeAndMessage(k, v, code, message)
+
+		if key, found := strings.CutPrefix(k, OCIPrefix); found {
+			if val, ok := v.(string); ok {
+				details[key] = val
+			}
+		}
+	}
+
+	return code, message, details
+}
+
+func AsOCIError(err error) (*OCIError, bool) {
+	var e *errors.Error
+	if !errors.As(err, &e) {
+		return nil, false
+	}
+
+	code, message, details := extractOCIProps(e.Properties)
+	if code == "" {
+		return nil, false
+	}
+
+	return &OCIError{Code: code, Message: message, Detail: details}, true
+}
 
 const (
 	// BlobUnknown          OCIErrorCode = "BLOB_UNKNOWN"
