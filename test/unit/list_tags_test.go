@@ -5,8 +5,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
-	"github.com/scality/static-oci-registry/pkg/errors"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
 	"github.com/scality/static-oci-registry/test/utils"
@@ -68,7 +68,7 @@ var _ = Describe("List Tags", Ordered, func() {
 		Context("Listing tags when ImageFinder fails", func() {
 			When("Listing tags for any image", func() {
 				It("should return an internal error", func() {
-					mockImageFinder.SetError(errors.New(domain.ErrRegistryInternal, nil))
+					mockImageFinder.SetError(errors.Wrap(domain.ErrRegistryInternal))
 
 					_, err := tagLister.ListTags(re.Image)
 					Expect(err).To(HaveOccurred())

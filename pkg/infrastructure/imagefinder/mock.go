@@ -1,14 +1,14 @@
 package imagefinder
 
 import (
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
-	"github.com/scality/static-oci-registry/pkg/errors"
 )
 
 type Mock struct {
 	data  map[domain.ImageName][]domain.SolutionVersion
-	error *errors.Error
+	error error
 }
 
 func NewMock() *Mock {
@@ -18,7 +18,7 @@ func NewMock() *Mock {
 	}
 }
 
-func (m *Mock) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion, *errors.Error) {
+func (m *Mock) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion, error) {
 	if m.error != nil {
 		return nil, m.error
 	}
@@ -27,10 +27,13 @@ func (m *Mock) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion, 
 		return contents, nil
 	}
 
-	return nil, errors.FromCode(domain.ErrImageNotFound, ocierrors.Unsupported).
-		Wrap("image not found in filesystem registry").
-		WithOCIMessage(domain.ErrImageNotFound.Error()).
-		WithOCIDetail("image_name", string(imageName))
+	return nil, errors.Wrap(
+		domain.ErrImageNotFound,
+		errors.WithDetail("image not found in filesystem registry"),
+		errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
+		errors.WithProperty(ocierrors.OCIMessage, domain.ErrImageNotFound.Error()),
+		errors.WithProperty(ocierrors.OCIPrefix+"image_name", string(imageName)),
+	)
 }
 
 func (m *Mock) RemoveErrors() {
@@ -50,6 +53,6 @@ func (m *Mock) AddImage(solution, version string, image domain.ImageName) {
 	}
 }
 
-func (m *Mock) SetError(err *errors.Error) {
+func (m *Mock) SetError(err error) {
 	m.error = err
 }

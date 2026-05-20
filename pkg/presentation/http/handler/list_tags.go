@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
-	"github.com/scality/static-oci-registry/pkg/errors"
 	httplayer "github.com/scality/static-oci-registry/pkg/presentation/http"
 	"github.com/scality/static-oci-registry/pkg/usecase"
 
@@ -54,7 +54,7 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // nolint:funlen,gocognit // this function is long and complex because of all the
 // checks and path parsing logic, and cannot be meaningfully shortened or split
 // parses a query and return the input type for ListTags usecase.
-func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
+func parseRequest(r *http.Request) (*domain.ListTagsInput, error) {
 	// Extract image name from URL path
 	// Path format: /v2/{image}/tags/list
 	// We use manual path parsing to support multi-level image names with slashes
@@ -68,10 +68,13 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 	err := img.Validate()
 	if err != nil {
 		// this is a domain error so no need to redefine it here
-		return nil, errors.FromCode(err, ocierrors.NameInvalid).
-			Wrap("error validating image name in query parser").
-			WithOCIMessage(err.Error()).
-			WithOCIDetail("image_name", string(img))
+		return nil, errors.Wrap(
+			err,
+			errors.WithDetail("error validating image name in query parser"),
+			errors.WithProperty(ocierrors.OCICode, ocierrors.NameInvalid),
+			errors.WithProperty(ocierrors.OCIMessage, err.Error()),
+			errors.WithProperty(ocierrors.OCIPrefix+"image_name", string(img)),
+		)
 	}
 
 	listTagsInput := &domain.ListTagsInput{Name: img}
@@ -84,10 +87,13 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 
 		err := lastTag.Validate()
 		if err != nil {
-			return nil, errors.FromCode(err, ocierrors.Unsupported).
-				Wrap("error validating last tag in query parser").
-				WithOCIMessage(err.Error()).
-				WithOCIDetail("last", last)
+			return nil, errors.Wrap(
+				err,
+				errors.WithDetail("error validating last tag in query parser"),
+				errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
+				errors.WithProperty(ocierrors.OCIMessage, err.Error()),
+				errors.WithProperty(ocierrors.OCIPrefix+"last", last),
+			)
 		}
 
 		listTagsInput.Last = &lastTag
@@ -97,20 +103,26 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, *errors.Error) {
 	if n != "" {
 		nint, err := strconv.ParseInt(n, 0, 0)
 		if err != nil {
-			return nil, errors.FromCode(domain.ErrInvalidParameter, ocierrors.Unsupported).
-				WrapErr(err).
-				Wrap("error validating n parameter in query parser").
-				WithOCIMessage("Invalid integer value in n parameter").
-				WithOCIDetail("n", n)
+			return nil, errors.Wrap(
+				domain.ErrInvalidParameter,
+				errors.WithDetail("error validating n parameter in query parser"),
+				errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
+				errors.WithProperty(ocierrors.OCIMessage, "Invalid integer value in n parameter"),
+				errors.WithProperty(ocierrors.OCIPrefix+"n", n),
+				errors.CausedBy(err),
+			)
 		}
 
 		tagLimit := int(nint)
 
 		if tagLimit < 0 || tagLimit > 1000 {
-			return nil, errors.FromCode(domain.ErrInvalidParameter, ocierrors.Unsupported).
-				Wrap("n parameter is out of range in query parser").
-				WithOCIMessage("n parameter must be between 0 and 1000").
-				WithOCIDetail("n", strconv.Itoa(tagLimit))
+			return nil, errors.Wrap(
+				domain.ErrInvalidParameter,
+				errors.WithDetail("n parameter is out of range in query parser"),
+				errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
+				errors.WithProperty(ocierrors.OCIMessage, "n parameter must be between 0 and 1000"),
+				errors.WithProperty(ocierrors.OCIPrefix+"n", strconv.Itoa(tagLimit)),
+			)
 		}
 
 		listTagsInput.N = &tagLimit
