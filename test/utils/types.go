@@ -2,12 +2,12 @@
 package utils
 
 import (
+	"log/slog"
 	"os"
 	"os/exec"
 
 	// nolint: revive,staticcheck // only gomega and ginkgo are to be used as dot imports
 	. "github.com/onsi/gomega"
-	"github.com/rs/zerolog"
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
@@ -30,7 +30,7 @@ type (
 
 	TestSuite struct {
 		FsRoot string
-		Logger *zerolog.Logger
+		Logger *slog.Logger
 		Name   string
 	}
 
@@ -99,9 +99,12 @@ func (s *TestSuite) CleanupFsRoot() {
 }
 
 func (s *TestSuite) InitLogger() {
-	l := zerolog.New(os.Stdout).Level(zerolog.FatalLevel).
-		With().Timestamp().Str("root", s.FsRoot).Str("test_suite", s.Name).Logger()
-	s.Logger = &l
+	// Suppress logs below a synthetic level above Error to mimic zerolog's FatalLevel filter.
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError + 1})
+	s.Logger = slog.New(handler).With(
+		slog.String("root", s.FsRoot),
+		slog.String("test_suite", s.Name),
+	)
 }
 
 func (s *TestSuite) FetchImage(re *RegistryEntry) {

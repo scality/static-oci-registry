@@ -3,6 +3,7 @@ package di
 import (
 	"context"
 	"crypto/tls"
+	"log/slog"
 	"net/http"
 
 	"github.com/scality/static-oci-registry/cmd/config"
@@ -10,17 +11,15 @@ import (
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
 	"github.com/scality/static-oci-registry/pkg/presentation/http/handler"
 	"github.com/scality/static-oci-registry/pkg/usecase"
-
-	"github.com/rs/zerolog"
 )
 
 type Container struct {
-	// baseCtx is the base context for the application.
-	baseCtx context.Context //nolint:containedctx
+	// ctx is the base context for the application.
+	ctx context.Context //nolint:containedctx
 
 	config *config.Environment
 
-	logger *zerolog.Logger
+	logger *slog.Logger
 
 	TLSConfig  *tls.Config
 	router     http.Handler
@@ -36,7 +35,7 @@ type Container struct {
 
 func NewContainer(ctx context.Context, cfg *config.Environment) *Container {
 	return &Container{
-		baseCtx: ctx,
-		config:  cfg,
+		ctx:    ctx,
+		config: cfg,
 	}
 }

@@ -2,6 +2,8 @@
 package imagefinder
 
 import (
+	"context"
+	"log/slog"
 	"os"
 	"sort"
 
@@ -10,16 +12,15 @@ import (
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 
 	"github.com/hashicorp/go-version"
-	"github.com/rs/zerolog"
 )
 
 type FileSystem struct {
-	logger *zerolog.Logger
+	logger *slog.Logger
 	fsRoot string
 }
 
 func NewFileSystem(
-	l *zerolog.Logger,
+	l *slog.Logger,
 	r string,
 ) (*FileSystem, error) {
 	// make sure r exists
@@ -33,21 +34,19 @@ func NewFileSystem(
 		return nil, errors.New("passed FS_ROOT is not a directory")
 	}
 
-	logger := l.With().Str("imagefinder", "filesystem").Logger()
-
 	return &FileSystem{
-		logger: &logger,
+		logger: l.With(slog.String("image_finder", "filesystem")),
 		fsRoot: r,
 	}, nil
 }
 
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
-func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion,
-	error,
+func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName) (
+	[]domain.SolutionVersion, error,
 ) {
-	l := fs.logger.With().Str("image_name", string(imageName)).Logger()
-	l.Info().Msg("Finding image in filesystem registry")
+	l := fs.logger.With(slog.String("image_name", string(imageName)))
+	l.InfoContext(ctx, "Finding image in filesystem registry")
 	// walks the fsroot by solution and version and gathers a list of `solution/version` dirs
 	// such that `solution/version/imageName` exists, is a dir, and is not empty
 	// return an error if no such directory exists
@@ -64,8 +63,9 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 
 	for _, solution := range solutions {
 		if !solution.IsDir() {
-			l.Warn().Str("solution", solution.Name()).
-				Msg("solutions in the root of the filesystem should all be directories")
+			l.WarnContext(ctx, "solutions in the root of the filesystem should all be directories",
+				slog.String("solution", solution.Name()),
+			)
 
 			continue
 		}
@@ -84,8 +84,10 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 
 		for _, candidate := range versionCandidates {
 			if !candidate.IsDir() {
-				l.Warn().Str("solution", solution.Name()).Str("version", candidate.Name()).
-					Msg("solution/version should be a directory")
+				l.WarnContext(ctx, "solution/version should be a directory",
+					slog.String("solution", solution.Name()),
+					slog.String("version", candidate.Name()),
+				)
 
 				continue
 			}
@@ -93,9 +95,11 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 			// validate that candidate.Name() is a valid semver
 			_, err := version.NewVersion(candidate.Name())
 			if err != nil {
-				l.Warn().Err(err).Str("solution", solution.Name()).
-					Str("version", candidate.Name()).
-					Msg("invalid version directory name found in solution")
+				l.WarnContext(ctx, "invalid version directory name found in solution",
+					slog.String("solution", solution.Name()),
+					slog.String("version", candidate.Name()),
+					slog.Any("error", err),
+				)
 
 				unsortedVersions = append(unsortedVersions, candidate)
 
@@ -136,8 +140,10 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 			}
 
 			if !info.IsDir() {
-				l.Warn().Str("solution", solution.Name()).Str("version", candidate.Name()).
-					Msg("solution/version/image_name should be a directory")
+				l.WarnContext(ctx, "solution/version/image_name should be a directory",
+					slog.String("solution", solution.Name()),
+					slog.String("version", candidate.Name()),
+				)
 
 				continue
 			}

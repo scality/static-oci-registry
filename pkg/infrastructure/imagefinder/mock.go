@@ -1,6 +1,8 @@
 package imagefinder
 
 import (
+	"context"
+
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
@@ -18,7 +20,9 @@ func NewMock() *Mock {
 	}
 }
 
-func (m *Mock) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion, error) {
+func (m *Mock) FindImage(_ context.Context, imageName domain.ImageName) (
+	[]domain.SolutionVersion, error,
+) {
 	if m.error != nil {
 		return nil, m.error
 	}

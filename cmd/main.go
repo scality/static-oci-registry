@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -38,7 +39,7 @@ func main() {
 	httpServer := container.GetHTTPServer()
 
 	go func() {
-		logger.Info().Msg("http server starting")
+		logger.InfoContext(ctx, "http server starting")
 
 		serveErr := httpServer.ListenAndServeTLS("", "")
 		if serveErr != nil {
@@ -46,11 +47,13 @@ func main() {
 
 			// ErrServerClosed is returned on graceful close so we want to ignore that
 			if !errors.Is(serveErr, http.ErrServerClosed) {
-				logger.Error().Err(serveErr).Msg("Error serving http")
+				logger.ErrorContext(ctx, "Error serving http",
+					slog.Any("error", serveErr),
+				)
 			}
 		}
 
-		logger.Info().Msg("http server stopped")
+		logger.InfoContext(ctx, "http server stopped")
 	}()
 
 	// wait for anything to signal server termination
@@ -58,8 +61,11 @@ func main() {
 
 	err = httpServer.Shutdown(ctx)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("Error shutting down http server")
+		logger.ErrorContext(ctx, "Error shutting down http server",
+			slog.Any("error", err),
+		)
+		os.Exit(1)
 	}
 
-	logger.Info().Msg("service stopped")
+	logger.InfoContext(ctx, "service stopped")
 }
