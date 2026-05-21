@@ -1,12 +1,20 @@
 package ocierrors
 
 import (
-	"maps"
+	"strings"
+
+	"github.com/scality/go-errors"
 )
 
 // these codes are defined in the OCI Distribution Spec
 // https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#error-codes
 type OCIErrorCode string
+
+type OCIError struct {
+	Code    OCIErrorCode      `json:"code"`
+	Message string            `json:"message,omitempty"`
+	Detail  map[string]string `json:"detail,omitempty"`
+}
 
 const (
 	// BlobUnknown          OCIErrorCode = "BLOB_UNKNOWN"
@@ -23,49 +31,74 @@ const (
 	// Denied              OCIErrorCode = "DENIED".
 	Unsupported OCIErrorCode = "UNSUPPORTED"
 	// TooManyRequests     OCIErrorCode = "TOO_MANY_REQUESTS".
+
+	// constants for OCI_xxx properties.
+	OCIPrefix  string = "OCI_"
+	OCICode    string = OCIPrefix + "CODE"
+	OCIMessage string = OCIPrefix + "MESSAGE"
 )
 
-// this structure is defined in the OCI distribution Spec
-// https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md#error-codes
-type OCIError struct {
-	Code    OCIErrorCode      `json:"code"`
-	Message string            `json:"message,omitempty"`
-	Detail  map[string]string `json:"detail,omitempty"`
-}
-
-func (e *OCIError) WithDetail(key, value string) *OCIError {
-	ret := &OCIError{
-		Code:    e.Code,
-		Message: e.Message,
-	}
-	if e.Detail != nil {
-		ret.Detail = make(map[string]string, len(e.Detail)+1)
-		maps.Copy(ret.Detail, e.Detail)
-	} else {
-		ret.Detail = make(map[string]string, 1)
+func AsOCIError(err error) (*OCIError, bool) {
+	var e *errors.Error
+	if !errors.As(err, &e) {
+		return nil, false
 	}
 
-	ret.Detail[key] = value
-
-	return ret
-}
-
-func (e *OCIError) WithMessage(msg string) *OCIError {
-	return &OCIError{
-		Code:    e.Code,
-		Message: msg,
-		Detail:  e.Detail,
+	code, message, details := extractOCIProps(e.Properties)
+	if code == "" {
+		return nil, false
 	}
+
+	return &OCIError{Code: code, Message: message, Detail: details}, true
 }
 
-func NewNameInvalid() *OCIError {
-	return &OCIError{Code: NameInvalid}
+func BuildOCIProperties(code OCIErrorCode, msg string, details map[string]string) errors.Option {
+	prop := make(map[string]any)
+
+	prop[OCICode] = code
+	if msg != "" {
+		prop[OCIMessage] = msg
+	}
+
+	for k, v := range details {
+		prop[OCIPrefix+k] = v
+	}
+
+	return errors.WithProperties(prop)
 }
 
-func NewNameUnknown() *OCIError {
-	return &OCIError{Code: NameUnknown}
+func extractCodeAndMessage(
+	k string, v any, code OCIErrorCode, message string,
+) (OCIErrorCode, string) {
+	switch k {
+	case OCICode:
+		if val, ok := v.(OCIErrorCode); ok {
+			return val, message
+		}
+	case OCIMessage:
+		if val, ok := v.(string); ok {
+			return code, val
+		}
+	}
+
+	return code, message
 }
 
-func NewUnsupported() *OCIError {
-	return &OCIError{Code: Unsupported}
+func extractOCIProps(props map[string]any) (OCIErrorCode, string, map[string]string) {
+	var code OCIErrorCode
+
+	message := ""
+	details := make(map[string]string)
+
+	for k, v := range props {
+		code, message = extractCodeAndMessage(k, v, code, message)
+
+		if key, found := strings.CutPrefix(k, OCIPrefix); found {
+			if val, ok := v.(string); ok {
+				details[key] = val
+			}
+		}
+	}
+
+	return code, message, details
 }

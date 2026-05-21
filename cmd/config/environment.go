@@ -9,7 +9,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/scality/go-errors"
+
 	"github.com/sethvargo/go-envconfig"
 )
 
@@ -45,7 +46,7 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 
 	err := cfg.Load(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed loading environment variables")
+		return nil, errors.Wrap(err, errors.WithDetail("failed loading environment variables"))
 	}
 
 	return cfg, nil
@@ -57,7 +58,7 @@ func (cfg *Environment) Load(ctx context.Context) error {
 	defer fmt.Println(cfg.ToString())
 
 	if err != nil {
-		return errors.Wrap(err, "failed loading config")
+		return errors.Wrap(err, errors.WithDetail("failed loading config"))
 	}
 
 	return nil

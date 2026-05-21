@@ -7,11 +7,11 @@ import (
 
 	// nolint: revive,staticcheck // only gomega and ginkgo are to be used as dot imports
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
-	apperrors "github.com/scality/static-oci-registry/pkg/errors"
+	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 )
 
 const (
@@ -45,16 +45,16 @@ func (re *RegistryEntry) ImagePath(root string) string {
 	return root + "/" + re.Solution + "/" + re.Version + "/" + string(re.Image)
 }
 
-func ValidateError(err *apperrors.Error) {
+func ValidateError(err error) {
 	// should not be nil
 	Expect(err).To(HaveOccurred())
 
 	// should either be an internal registry error, or have a non-nil ociError field
-	if errors.Is(errors.Cause(err), domain.ErrRegistryInternal) {
+	if errors.Is(err, domain.ErrRegistryInternal) {
 		return
 	}
 
-	ociErr, ok := apperrors.AsOCIError(err)
+	ociErr, ok := ocierrors.AsOCIError(err)
 	// should have ociError field
 	Expect(ok).To(BeTrue())
 
