@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,27 +18,43 @@ import (
 const timeoutDurationInSeconds = 5
 
 func main() {
+	log.Printf("Starting %s version %s", config.ApplicationName, config.ApplicationVersion)
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutDurationInSeconds*time.Second)
 	defer cancel()
 
 	cfg, err := config.NewEnvironment(ctx)
 	if err != nil {
-		fmt.Printf("Error loading config: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Error loading config: %v", err)
 	}
 
 	container := di.NewContainer(ctx, cfg)
 
 	logger := container.GetLogger()
 
-	logger.InfoContext(ctx, "starting application")
-
+	// handle Shutdown signals from the OS
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	httpServer := container.GetHTTPServer()
 
-	go runHTTPServer(ctx, logger, httpServer, sigCh)
+	go func() {
+		logger.InfoContext(ctx, "http server starting")
+
+		serveErr := httpServer.ListenAndServeTLS("", "")
+		if serveErr != nil {
+			sigCh <- syscall.SIGTERM
+
+			// ErrServerClosed is returned on graceful close so we want to ignore that
+			if !errors.Is(serveErr, http.ErrServerClosed) {
+				logger.ErrorContext(ctx, "Error serving http",
+					slog.Any("error_message", serveErr),
+				)
+			}
+		}
+
+		logger.InfoContext(ctx, "http server stopped")
+	}()
 
 	// wait for anything to signal server termination
 	<-sigCh
@@ -52,27 +68,4 @@ func main() {
 	}
 
 	logger.InfoContext(ctx, "service stopped")
-}
-
-func runHTTPServer(
-	ctx context.Context,
-	logger *slog.Logger,
-	srv *http.Server,
-	sigCh chan<- os.Signal,
-) {
-	logger.InfoContext(ctx, "http server starting")
-
-	serveErr := srv.ListenAndServeTLS("", "")
-	if serveErr != nil {
-		sigCh <- syscall.SIGTERM
-
-		// ErrServerClosed is returned on graceful close so we want to ignore that
-		if !errors.Is(serveErr, http.ErrServerClosed) {
-			logger.ErrorContext(ctx, "Error serving http",
-				slog.Any("error_message", serveErr),
-			)
-		}
-	}
-
-	logger.InfoContext(ctx, "http server stopped")
 }

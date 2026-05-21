@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"context"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,7 +36,7 @@ var _ = Describe("Find Images", Ordered, func() {
 			It("should return the correct solution versions", func() {
 				suite.FetchImage(re)
 
-				found, err := imageFinder.FindImage(context.Background(), re.Image)
+				found, err := imageFinder.FindImage(re.Image)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(found).NotTo(BeEmpty())
@@ -48,7 +47,7 @@ var _ = Describe("Find Images", Ordered, func() {
 			It("should return a not found error", func() {
 				suite.FetchImage(re)
 
-				_, err := imageFinder.FindImage(context.Background(), "ghcr.io/nonexistent/image")
+				_, err := imageFinder.FindImage("ghcr.io/nonexistent/image")
 
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
@@ -67,7 +66,7 @@ var _ = Describe("Find Images", Ordered, func() {
 				rebad.Version = "v9.9.9"
 				os.MkdirAll(rebad.ImagePath(suite.FsRoot), utils.PermissionNone)
 
-				_, err := imageFinder.FindImage(context.Background(), re.Image)
+				_, err := imageFinder.FindImage(re.Image)
 
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
@@ -79,7 +78,7 @@ var _ = Describe("Find Images", Ordered, func() {
 			It("should return a registry internal error", func() {
 				os.MkdirAll(suite.FsRoot+"/find-images-solution-baddir", utils.PermissionNoRead)
 
-				_, err := imageFinder.FindImage(context.Background(), re.Image)
+				_, err := imageFinder.FindImage(re.Image)
 
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
@@ -94,7 +93,7 @@ var _ = Describe("Find Images", Ordered, func() {
 			It("should return a registry internal error", func() {
 				os.Chmod(suite.FsRoot, utils.PermissionNoRead)
 
-				_, err := imageFinder.FindImage(context.Background(), re.Image)
+				_, err := imageFinder.FindImage(re.Image)
 
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)

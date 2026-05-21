@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"context"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -43,7 +42,7 @@ var _ = Describe("List Tags", Ordered, func() {
 			It("should return the correct tags", func() {
 				suite.FetchImage(re)
 
-				tags, err := tagLister.ListTags(context.Background(), re.Image)
+				tags, err := tagLister.ListTags(re.Image)
 				Expect(err).NotTo(HaveOccurred())
 
 				// validate contents of tags list
@@ -57,7 +56,7 @@ var _ = Describe("List Tags", Ordered, func() {
 
 		When("using a non existant image", func() {
 			It("should return a not found error", func() {
-				_, err := tagLister.ListTags(context.Background(), "ghcr.io/nonexistent/image")
+				_, err := tagLister.ListTags("ghcr.io/nonexistent/image")
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
 				Expect(err).To(MatchError(domain.ErrImageNotFound))
@@ -71,7 +70,7 @@ var _ = Describe("List Tags", Ordered, func() {
 				It("should return an internal error", func() {
 					mockImageFinder.SetError(errors.New(domain.ErrRegistryInternal, nil))
 
-					_, err := tagLister.ListTags(context.Background(), re.Image)
+					_, err := tagLister.ListTags(re.Image)
 					Expect(err).To(HaveOccurred())
 					utils.ValidateError(err)
 					Expect(err).To(MatchError(domain.ErrRegistryInternal))
@@ -85,7 +84,7 @@ var _ = Describe("List Tags", Ordered, func() {
 					suite.FetchImage(re)
 					os.Chmod(re.ImagePath(suite.FsRoot), utils.PermissionNoRead)
 
-					_, err := tagLister.ListTags(context.Background(), re.Image)
+					_, err := tagLister.ListTags(re.Image)
 					Expect(err).To(HaveOccurred())
 					utils.ValidateError(err)
 					Expect(err).To(MatchError(domain.ErrRegistryInternal))
