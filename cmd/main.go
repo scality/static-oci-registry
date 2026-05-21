@@ -48,7 +48,7 @@ func main() {
 			// ErrServerClosed is returned on graceful close so we want to ignore that
 			if !errors.Is(serveErr, http.ErrServerClosed) {
 				logger.ErrorContext(ctx, "Error serving http",
-					slog.Any("error_message", serveErr),
+					slog.Any("error", serveErr),
 				)
 			}
 		}
@@ -62,7 +62,7 @@ func main() {
 	err = httpServer.Shutdown(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "Error shutting down http server",
-			slog.Any("error_message", err),
+			slog.Any("error", err),
 		)
 		os.Exit(1)
 	}

@@ -21,7 +21,7 @@ func RespondWithJSON(
 	w.WriteHeader(statusCode)
 
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		l.ErrorContext(ctx, "failed to encode response", slog.Any("error_message", err))
+		l.ErrorContext(ctx, "failed to encode response", slog.Any("error", err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

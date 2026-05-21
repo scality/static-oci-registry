@@ -96,7 +96,7 @@ func (fs *FileSystem) ListTags(ctx context.Context, imageName domain.ImageName) 
 			err := tag.Validate()
 			if err != nil {
 				tl.WarnContext(ctx, "invalid tag found, skipping",
-					slog.Any("error_message", err),
+					slog.Any("error", err),
 				)
 
 				continue

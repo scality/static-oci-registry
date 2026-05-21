@@ -16,7 +16,7 @@ func (c *Container) getTagLister() *taglister.FileSystem {
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create tag lister",
-				slog.Any("error_message", err),
+				slog.Any("error", err),
 			)
 			os.Exit(1) //nolint:revive // Fatal-equivalent for DI initialization failure
 		}

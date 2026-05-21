@@ -29,7 +29,7 @@ func (er *ErrorResponse) AddError(oci ocierrors.OCIError) {
 // nolint:funlen // this contains a long, unsplittable switch statement
 // HandleError handles domain errors and sends appropriate HTTP responses based on the error type.
 func HandleError(ctx context.Context, w http.ResponseWriter, err error, l *slog.Logger) {
-	l.WarnContext(ctx, "handling error", slog.Any("error_message", err))
+	l.WarnContext(ctx, "handling error", slog.Any("error", err))
 
 	if errors.Is(errors.Cause(err), domain.ErrRegistryInternal) {
 		http.Error(w, "", http.StatusInternalServerError)
@@ -44,6 +44,6 @@ func HandleError(ctx context.Context, w http.ResponseWriter, err error, l *slog.
 		return
 	}
 
-	l.WarnContext(ctx, "is an unhandled error type", slog.Any("error_message", err))
+	l.WarnContext(ctx, "is an unhandled error type", slog.Any("error", err))
 	http.Error(w, "", http.StatusNotFound)
 }

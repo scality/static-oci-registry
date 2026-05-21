@@ -24,7 +24,7 @@ func (c *Container) getTLSConfig() *tls.Config {
 			c.GetLogger().ErrorContext(c.ctx, "failed to load server certificate and key",
 				slog.String("http_tls_cert_file_path", c.config.HTTP.TLS.CertFilePath),
 				slog.String("http_tls_key_file_path", c.config.HTTP.TLS.KeyFilePath),
-				slog.Any("error_message", err),
+				slog.Any("error", err),
 			)
 			os.Exit(1) //nolint:revive // Fatal-equivalent for DI initialization failure
 		}

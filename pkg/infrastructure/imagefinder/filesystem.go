@@ -95,7 +95,7 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 				l.WarnContext(ctx, "invalid version directory name found in solution",
 					slog.String("solution", solution.Name()),
 					slog.String("version", candidate.Name()),
-					slog.Any("error_message", err),
+					slog.Any("error", err),
 				)
 
 				unsortedVersions = append(unsortedVersions, candidate)

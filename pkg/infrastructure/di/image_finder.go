@@ -15,7 +15,7 @@ func (c *Container) getImageFinder() *imagefinder.FileSystem {
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create image finder",
-				slog.Any("error_message", err),
+				slog.Any("error", err),
 			)
 			os.Exit(1) //nolint:revive // Fatal-equivalent for DI initialization failure
 		}
