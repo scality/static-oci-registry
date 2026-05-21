@@ -30,9 +30,11 @@ func (m *Mock) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion, 
 	return nil, errors.Wrap(
 		domain.ErrImageNotFound,
 		errors.WithDetail("image not found in filesystem registry"),
-		errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
-		errors.WithProperty(ocierrors.OCIMessage, domain.ErrImageNotFound.Error()),
-		errors.WithProperty(ocierrors.OCIPrefix+"image_name", string(imageName)),
+		ocierrors.BuildOCIProperties(
+			ocierrors.Unsupported,
+			domain.ErrImageNotFound.Error(),
+			map[string]string{"image_name": string(imageName)},
+		),
 	)
 }
 

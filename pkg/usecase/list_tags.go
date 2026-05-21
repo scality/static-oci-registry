@@ -41,9 +41,11 @@ func (uc *ListTags) Execute(input domain.ListTagsInput) (*domain.ListTagsOutput,
 		if !slices.Contains(listTagsOutput.Tags, *input.Last) {
 			return nil, errors.Wrap(
 				domain.ErrTagNotFound,
-				errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
-				errors.WithProperty(ocierrors.OCIMessage, domain.ErrTagNotFound.Error()),
-				errors.WithProperty(ocierrors.OCIPrefix+"last", string(*input.Last)),
+				ocierrors.BuildOCIProperties(
+					ocierrors.Unsupported,
+					domain.ErrTagNotFound.Error(),
+					map[string]string{"last": string(*input.Last)},
+				),
 			)
 		}
 

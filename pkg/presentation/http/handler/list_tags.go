@@ -71,9 +71,11 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, error) {
 		return nil, errors.Wrap(
 			err,
 			errors.WithDetail("error validating image name in query parser"),
-			errors.WithProperty(ocierrors.OCICode, ocierrors.NameInvalid),
-			errors.WithProperty(ocierrors.OCIMessage, err.Error()),
-			errors.WithProperty(ocierrors.OCIPrefix+"image_name", string(img)),
+			ocierrors.BuildOCIProperties(
+				ocierrors.NameInvalid,
+				err.Error(),
+				map[string]string{"image_name": string(img)},
+			),
 		)
 	}
 
@@ -90,9 +92,11 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, error) {
 			return nil, errors.Wrap(
 				err,
 				errors.WithDetail("error validating last tag in query parser"),
-				errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
-				errors.WithProperty(ocierrors.OCIMessage, err.Error()),
-				errors.WithProperty(ocierrors.OCIPrefix+"last", last),
+				ocierrors.BuildOCIProperties(
+					ocierrors.Unsupported,
+					err.Error(),
+					map[string]string{"last": last},
+				),
 			)
 		}
 
@@ -106,9 +110,11 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, error) {
 			return nil, errors.Wrap(
 				domain.ErrInvalidParameter,
 				errors.WithDetail("error validating n parameter in query parser"),
-				errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
-				errors.WithProperty(ocierrors.OCIMessage, "Invalid integer value in n parameter"),
-				errors.WithProperty(ocierrors.OCIPrefix+"n", n),
+				ocierrors.BuildOCIProperties(
+					ocierrors.Unsupported,
+					"Invalid integer value in n parameter",
+					map[string]string{"n": n},
+				),
 				errors.CausedBy(err),
 			)
 		}
@@ -119,9 +125,11 @@ func parseRequest(r *http.Request) (*domain.ListTagsInput, error) {
 			return nil, errors.Wrap(
 				domain.ErrInvalidParameter,
 				errors.WithDetail("n parameter is out of range in query parser"),
-				errors.WithProperty(ocierrors.OCICode, ocierrors.Unsupported),
-				errors.WithProperty(ocierrors.OCIMessage, "n parameter must be between 0 and 1000"),
-				errors.WithProperty(ocierrors.OCIPrefix+"n", strconv.Itoa(tagLimit)),
+				ocierrors.BuildOCIProperties(
+					ocierrors.Unsupported,
+					"n parameter must be between 0 and 1000",
+					map[string]string{"n": strconv.Itoa(tagLimit)},
+				),
 			)
 		}
 

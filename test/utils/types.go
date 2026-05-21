@@ -54,7 +54,7 @@ func ValidateError(err error) {
 		return
 	}
 
-	ociErr, ok := ocierrors.AsOCIError(err) // move this somewhere useful
+	ociErr, ok := ocierrors.AsOCIError(err)
 	// should have ociError field
 	Expect(ok).To(BeTrue())
 
