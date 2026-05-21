@@ -33,19 +33,21 @@ func NewListTags(
 }
 
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	listTagsInput, err := parseRequest(r)
 	if err != nil {
-		httplayer.HandleError(w, err, h.logger)
+		httplayer.HandleError(ctx, w, err, h.logger)
 		return
 	}
 
-	listTagsOutput, err := h.listTagsUseCase.Execute(r.Context(), *listTagsInput)
+	listTagsOutput, err := h.listTagsUseCase.Execute(ctx, *listTagsInput)
 	if err != nil {
-		httplayer.HandleError(w, err, h.logger)
+		httplayer.HandleError(ctx, w, err, h.logger)
 		return
 	}
 
-	httplayer.RespondWithJSON(w, listTagsOutput, http.StatusOK, h.logger)
+	httplayer.RespondWithJSON(ctx, w, listTagsOutput, http.StatusOK, h.logger)
 }
 
 // nolint:funlen,gocognit // this function is long and complex because of all the

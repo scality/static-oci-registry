@@ -2,6 +2,7 @@
 package taglister
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"slices"
@@ -44,13 +45,13 @@ func NewFileSystem(
 
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
-func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutput,
-	*apperrors.Error,
+func (fs *FileSystem) ListTags(ctx context.Context, imageName domain.ImageName) (
+	*domain.ListTagsOutput, *apperrors.Error,
 ) {
 	l := fs.logger.With(slog.String("image_name", string(imageName)))
-	l.Info("Finding tags in filesystem registry")
+	l.InfoContext(ctx, "Finding tags in filesystem registry")
 	// the registry is stored in the filesystem at fsRoot
-	candidates, err := fs.imageFinder.FindImage(imageName)
+	candidates, err := fs.imageFinder.FindImage(ctx, imageName)
 	if err != nil {
 		return nil, err.Wrap("failed to find image in filesystem registry")
 	}
@@ -78,7 +79,7 @@ func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutp
 			// make sure this directory contains a manifest.json file
 			manifestPath := dir + "/" + entry.Name() + "/manifest.json"
 			if info, err := os.Stat(manifestPath); err != nil || info.IsDir() {
-				l.Warn("location/tag directory does not contain manifest.json file",
+				l.WarnContext(ctx, "location/tag directory does not contain manifest.json file",
 					slog.String("location", dir),
 					slog.String("tag", entry.Name()),
 				)
@@ -94,7 +95,7 @@ func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutp
 
 			err := tag.Validate()
 			if err != nil {
-				tl.Warn("invalid tag found, skipping",
+				tl.WarnContext(ctx, "invalid tag found, skipping",
 					slog.Any("error_message", err),
 				)
 
@@ -102,7 +103,7 @@ func (fs *FileSystem) ListTags(imageName domain.ImageName) (*domain.ListTagsOutp
 			}
 
 			if slices.Contains(allTags, tag) {
-				tl.Warn("duplicate tag found, skipping")
+				tl.WarnContext(ctx, "duplicate tag found, skipping")
 
 				continue
 			}

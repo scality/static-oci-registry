@@ -2,6 +2,7 @@
 package imagefinder
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"sort"
@@ -42,11 +43,11 @@ func NewFileSystem(
 
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
-func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVersion,
-	*apperrors.Error,
+func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName) (
+	[]domain.SolutionVersion, *apperrors.Error,
 ) {
 	l := fs.logger.With(slog.String("image_name", string(imageName)))
-	l.Info("Finding image in filesystem registry")
+	l.InfoContext(ctx, "Finding image in filesystem registry")
 	// walks the fsroot by solution and version and gathers a list of `solution/version` dirs
 	// such that `solution/version/imageName` exists, is a dir, and is not empty
 	// return an error if no such directory exists
@@ -61,7 +62,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 
 	for _, solution := range solutions {
 		if !solution.IsDir() {
-			l.Warn("solutions in the root of the filesystem should all be directories",
+			l.WarnContext(ctx, "solutions in the root of the filesystem should all be directories",
 				slog.String("solution", solution.Name()),
 			)
 
@@ -80,7 +81,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 
 		for _, candidate := range versionCandidates {
 			if !candidate.IsDir() {
-				l.Warn("solution/version should be a directory",
+				l.WarnContext(ctx, "solution/version should be a directory",
 					slog.String("solution", solution.Name()),
 					slog.String("version", candidate.Name()),
 				)
@@ -91,7 +92,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 			// validate that candidate.Name() is a valid semver
 			_, err := version.NewVersion(candidate.Name())
 			if err != nil {
-				l.Warn("invalid version directory name found in solution",
+				l.WarnContext(ctx, "invalid version directory name found in solution",
 					slog.String("solution", solution.Name()),
 					slog.String("version", candidate.Name()),
 					slog.Any("error_message", err),
@@ -134,7 +135,7 @@ func (fs *FileSystem) FindImage(imageName domain.ImageName) ([]domain.SolutionVe
 			}
 
 			if !info.IsDir() {
-				l.Warn("solution/version/image_name should be a directory",
+				l.WarnContext(ctx, "solution/version/image_name should be a directory",
 					slog.String("solution", solution.Name()),
 					slog.String("version", candidate.Name()),
 				)

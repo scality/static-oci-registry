@@ -32,7 +32,7 @@ func (uc *ListTags) Execute(ctx context.Context, input domain.ListTagsInput) (
 	l := uc.logger.With(slog.String("image_name", string(input.Name)))
 	l.InfoContext(ctx, "Listing tags for image")
 
-	listTagsOutput, err := uc.tagLister.ListTags(input.Name)
+	listTagsOutput, err := uc.tagLister.ListTags(ctx, input.Name)
 	if err != nil {
 		return nil, err.Wrap("failed to list tags")
 	}
