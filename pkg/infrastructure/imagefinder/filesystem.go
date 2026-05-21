@@ -7,12 +7,11 @@ import (
 	"os"
 	"sort"
 
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
-	apperrors "github.com/scality/static-oci-registry/pkg/errors"
 
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 )
 
 type FileSystem struct {
@@ -27,7 +26,7 @@ func NewFileSystem(
 	// make sure r exists
 	info, err := os.Stat(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to access FS_ROOT")
+		return nil, errors.Wrap(err, errors.WithDetail("unable to access FS_ROOT"))
 	}
 
 	// make sure r is a directory
@@ -44,7 +43,7 @@ func NewFileSystem(
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
 func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName) (
-	[]domain.SolutionVersion, *apperrors.Error,
+	[]domain.SolutionVersion, error,
 ) {
 	l := fs.logger.With(slog.String("image_name", string(imageName)))
 	l.InfoContext(ctx, "Finding image in filesystem registry")
@@ -53,9 +52,11 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 	// return an error if no such directory exists
 	solutions, err := os.ReadDir(fs.fsRoot)
 	if err != nil {
-		return nil, apperrors.New(domain.ErrRegistryInternal, nil).
-			WrapErr(err).
-			Wrap("failed to read fs root in filesystem registry")
+		return nil, errors.Wrap(
+			domain.ErrRegistryInternal,
+			errors.CausedBy(err),
+			errors.WithDetail("failed to read fs root in filesystem registry"),
+		)
 	}
 
 	found := make([]domain.SolutionVersion, 0)
@@ -71,9 +72,11 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 
 		versionCandidates, err := os.ReadDir(fs.fsRoot + "/" + solution.Name())
 		if err != nil {
-			return nil, apperrors.New(domain.ErrRegistryInternal, nil).
-				WrapErr(err).
-				Wrap("failed to read solution dir in filesystem registry")
+			return nil, errors.Wrap(
+				domain.ErrRegistryInternal,
+				errors.CausedBy(err),
+				errors.WithDetail("failed to read solution dir in filesystem registry"),
+			)
 		}
 
 		versions := make([]os.DirEntry, 0)
@@ -126,9 +129,11 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 			)
 			if err != nil {
 				if !os.IsNotExist(err) {
-					return nil, apperrors.New(domain.ErrRegistryInternal, nil).
-						WrapErr(err).
-						Wrap("failed to stat image dir in filesystem registry")
+					return nil, errors.Wrap(
+						domain.ErrRegistryInternal,
+						errors.CausedBy(err),
+						errors.WithDetail("failed to stat image dir in filesystem registry"),
+					)
 				}
 
 				continue
@@ -151,10 +156,15 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 	}
 
 	if len(found) == 0 {
-		return nil, apperrors.FromCode(domain.ErrImageNotFound, ocierrors.NameUnknown).
-			Wrap("image not found in filesystem registry").
-			WithOCIMessage(domain.ErrImageNotFound.Error()).
-			WithOCIDetail("image_name", string(imageName))
+		return nil, errors.Wrap(
+			domain.ErrImageNotFound,
+			errors.WithDetail("image not found in filesystem registry"),
+			ocierrors.BuildOCIProperties(
+				ocierrors.NameUnknown,
+				domain.ErrImageNotFound.Error(),
+				map[string]string{"image_name": string(imageName)},
+			),
+		)
 	}
 
 	return found, nil

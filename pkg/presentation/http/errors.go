@@ -5,11 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
-	apperrors "github.com/scality/static-oci-registry/pkg/errors"
-
-	"github.com/pkg/errors"
 )
 
 type ErrorResponse struct {
@@ -31,12 +29,12 @@ func (er *ErrorResponse) AddError(oci ocierrors.OCIError) {
 func HandleError(ctx context.Context, w http.ResponseWriter, err error, l *slog.Logger) {
 	l.WarnContext(ctx, "handling error", slog.Any("error", err))
 
-	if errors.Is(errors.Cause(err), domain.ErrRegistryInternal) {
+	if errors.Is(err, domain.ErrRegistryInternal) {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
 
-	if ociErr, ok := apperrors.AsOCIError(err); ok {
+	if ociErr, ok := ocierrors.AsOCIError(err); ok {
 		errorResponse := NewErrorResponse()
 		errorResponse.AddError(*ociErr)
 		RespondWithJSON(ctx, w, errorResponse, http.StatusNotFound, l)

@@ -7,11 +7,9 @@ import (
 	"os"
 	"slices"
 
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
-	apperrors "github.com/scality/static-oci-registry/pkg/errors"
 	"github.com/scality/static-oci-registry/pkg/service"
-
-	"github.com/pkg/errors"
 )
 
 type FileSystem struct {
@@ -28,7 +26,7 @@ func NewFileSystem(
 	// make sure r exists
 	info, err := os.Stat(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to access FS_ROOT")
+		return nil, errors.Wrap(err, errors.WithDetail("unable to access FS_ROOT"))
 	}
 
 	// make sure r is a directory
@@ -46,14 +44,14 @@ func NewFileSystem(
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
 func (fs *FileSystem) ListTags(ctx context.Context, imageName domain.ImageName) (
-	*domain.ListTagsOutput, *apperrors.Error,
+	*domain.ListTagsOutput, error,
 ) {
 	l := fs.logger.With(slog.String("image_name", string(imageName)))
 	l.InfoContext(ctx, "Finding tags in filesystem registry")
 	// the registry is stored in the filesystem at fsRoot
 	candidates, err := fs.imageFinder.FindImage(ctx, imageName)
 	if err != nil {
-		return nil, err.Wrap("failed to find image in filesystem registry")
+		return nil, errors.Wrap(err, errors.WithDetail("failed to find image in filesystem registry"))
 	}
 
 	allTags := make([]domain.Tag, 0, len(candidates))
@@ -66,9 +64,11 @@ func (fs *FileSystem) ListTags(ctx context.Context, imageName domain.ImageName) 
 
 		tagEntries, err := os.ReadDir(dir)
 		if err != nil {
-			return nil, apperrors.New(domain.ErrRegistryInternal, nil).
-				WrapErr(err).
-				Wrap("failed to read an image dir in filesystem registry")
+			return nil, errors.Wrap(
+				domain.ErrRegistryInternal,
+				errors.CausedBy(err),
+				errors.WithDetail("failed to read an image dir in filesystem registry"),
+			)
 		}
 
 		for _, entry := range tagEntries {

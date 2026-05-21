@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"github.com/pkg/errors"
+	"github.com/scality/go-errors"
 )
 
 var (
