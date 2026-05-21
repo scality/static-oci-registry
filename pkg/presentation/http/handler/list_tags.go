@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -9,8 +10,6 @@ import (
 	"github.com/scality/static-oci-registry/pkg/errors"
 	httplayer "github.com/scality/static-oci-registry/pkg/presentation/http"
 	"github.com/scality/static-oci-registry/pkg/usecase"
-
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -19,36 +18,36 @@ const (
 )
 
 type ListTags struct {
-	logger          *zerolog.Logger
+	logger          *slog.Logger
 	listTagsUseCase *usecase.ListTags
 }
 
 func NewListTags(
 	listTagsUseCase *usecase.ListTags,
-	logger *zerolog.Logger,
+	logger *slog.Logger,
 ) *ListTags {
-	l := logger.With().Str("http_handler", "list_tags").Logger()
-
 	return &ListTags{
 		listTagsUseCase: listTagsUseCase,
-		logger:          &l,
+		logger:          logger.With(slog.String("http_handler", "list_tags")),
 	}
 }
 
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	listTagsInput, err := parseRequest(r)
 	if err != nil {
-		httplayer.HandleError(w, err, h.logger)
+		httplayer.HandleError(ctx, w, err, h.logger)
 		return
 	}
 
-	listTagsOutput, err := h.listTagsUseCase.Execute(*listTagsInput)
+	listTagsOutput, err := h.listTagsUseCase.Execute(ctx, *listTagsInput)
 	if err != nil {
-		httplayer.HandleError(w, err, h.logger)
+		httplayer.HandleError(ctx, w, err, h.logger)
 		return
 	}
 
-	httplayer.RespondWithJSON(w, listTagsOutput, http.StatusOK, h.logger)
+	httplayer.RespondWithJSON(ctx, w, listTagsOutput, http.StatusOK, h.logger)
 }
 
 // nolint:funlen,gocognit // this function is long and complex because of all the

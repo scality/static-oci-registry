@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,49 +18,61 @@ import (
 const timeoutDurationInSeconds = 5
 
 func main() {
-	log.Printf("Starting %s version %s", config.ApplicationName, config.ApplicationVersion)
-
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutDurationInSeconds*time.Second)
 	defer cancel()
 
 	cfg, err := config.NewEnvironment(ctx)
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		fmt.Printf("Error loading config: %v\n", err)
+		os.Exit(1)
 	}
 
 	container := di.NewContainer(ctx, cfg)
 
 	logger := container.GetLogger()
 
-	// handle Shutdown signals from the OS
+	logger.InfoContext(ctx, "starting application")
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	httpServer := container.GetHTTPServer()
 
-	go func() {
-		logger.Info().Msg("http server starting")
-
-		serveErr := httpServer.ListenAndServeTLS("", "")
-		if serveErr != nil {
-			sigCh <- syscall.SIGTERM
-
-			// ErrServerClosed is returned on graceful close so we want to ignore that
-			if !errors.Is(serveErr, http.ErrServerClosed) {
-				logger.Error().Err(serveErr).Msg("Error serving http")
-			}
-		}
-
-		logger.Info().Msg("http server stopped")
-	}()
+	go runHTTPServer(ctx, logger, httpServer, sigCh)
 
 	// wait for anything to signal server termination
 	<-sigCh
 
 	err = httpServer.Shutdown(ctx)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("Error shutting down http server")
+		logger.ErrorContext(ctx, "Error shutting down http server",
+			slog.Any("error_message", err),
+		)
+		os.Exit(1)
 	}
 
-	logger.Info().Msg("service stopped")
+	logger.InfoContext(ctx, "service stopped")
+}
+
+func runHTTPServer(
+	ctx context.Context,
+	logger *slog.Logger,
+	srv *http.Server,
+	sigCh chan<- os.Signal,
+) {
+	logger.InfoContext(ctx, "http server starting")
+
+	serveErr := srv.ListenAndServeTLS("", "")
+	if serveErr != nil {
+		sigCh <- syscall.SIGTERM
+
+		// ErrServerClosed is returned on graceful close so we want to ignore that
+		if !errors.Is(serveErr, http.ErrServerClosed) {
+			logger.ErrorContext(ctx, "Error serving http",
+				slog.Any("error_message", serveErr),
+			)
+		}
+	}
+
+	logger.InfoContext(ctx, "http server stopped")
 }

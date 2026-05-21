@@ -1,38 +1,38 @@
 package usecase
 
 import (
+	"context"
+	"log/slog"
 	"slices"
 
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 	"github.com/scality/static-oci-registry/pkg/errors"
 	"github.com/scality/static-oci-registry/pkg/service"
-
-	"github.com/rs/zerolog"
 )
 
 type ListTags struct {
-	logger    *zerolog.Logger
+	logger    *slog.Logger
 	tagLister service.TagLister
 }
 
 func NewListTags(
-	logger *zerolog.Logger,
+	logger *slog.Logger,
 	tagLister service.TagLister,
 ) *ListTags {
-	l := logger.With().Str("use_case", "list_tags").Logger()
-
 	return &ListTags{
-		logger:    &l,
+		logger:    logger.With(slog.String("use_case", "list_tags")),
 		tagLister: tagLister,
 	}
 }
 
-func (uc *ListTags) Execute(input domain.ListTagsInput) (*domain.ListTagsOutput, *errors.Error) {
-	l := uc.logger.With().Str("image_name", string(input.Name)).Logger()
-	l.Info().Msg("Listing tags for image")
+func (uc *ListTags) Execute(ctx context.Context, input domain.ListTagsInput) (
+	*domain.ListTagsOutput, *errors.Error,
+) {
+	l := uc.logger.With(slog.String("image_name", string(input.Name)))
+	l.InfoContext(ctx, "Listing tags for image")
 
-	listTagsOutput, err := uc.tagLister.ListTags(input.Name)
+	listTagsOutput, err := uc.tagLister.ListTags(ctx, input.Name)
 	if err != nil {
 		return nil, err.Wrap("failed to list tags")
 	}

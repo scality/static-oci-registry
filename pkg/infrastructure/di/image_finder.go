@@ -1,6 +1,9 @@
 package di
 
 import (
+	"log/slog"
+	"os"
+
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 )
 
@@ -11,7 +14,10 @@ func (c *Container) getImageFinder() *imagefinder.FileSystem {
 			c.config.FS.Root,
 		)
 		if err != nil {
-			c.GetLogger().Fatal().Err(err).Msg("failed to create image finder")
+			c.GetLogger().ErrorContext(c.ctx, "failed to create image finder",
+				slog.Any("error_message", err),
+			)
+			os.Exit(1) //nolint:revive // Fatal-equivalent for DI initialization failure
 		}
 
 		c.imageFinder = i

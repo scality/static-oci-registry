@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/scality/static-oci-registry/pkg/domain"
@@ -8,7 +10,6 @@ import (
 	apperrors "github.com/scality/static-oci-registry/pkg/errors"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 )
 
 type ErrorResponse struct {
@@ -27,8 +28,8 @@ func (er *ErrorResponse) AddError(oci ocierrors.OCIError) {
 
 // nolint:funlen // this contains a long, unsplittable switch statement
 // HandleError handles domain errors and sends appropriate HTTP responses based on the error type.
-func HandleError(w http.ResponseWriter, err error, l *zerolog.Logger) {
-	l.Warn().Err(err).Msg("handling error")
+func HandleError(ctx context.Context, w http.ResponseWriter, err error, l *slog.Logger) {
+	l.WarnContext(ctx, "handling error", slog.Any("error_message", err))
 
 	if errors.Is(errors.Cause(err), domain.ErrRegistryInternal) {
 		http.Error(w, "", http.StatusInternalServerError)
@@ -38,11 +39,11 @@ func HandleError(w http.ResponseWriter, err error, l *zerolog.Logger) {
 	if ociErr, ok := apperrors.AsOCIError(err); ok {
 		errorResponse := NewErrorResponse()
 		errorResponse.AddError(*ociErr)
-		RespondWithJSON(w, errorResponse, http.StatusNotFound, l)
+		RespondWithJSON(ctx, w, errorResponse, http.StatusNotFound, l)
 
 		return
 	}
 
-	l.Warn().Err(err).Msg("is an unhandled error type")
+	l.WarnContext(ctx, "is an unhandled error type", slog.Any("error_message", err))
 	http.Error(w, "", http.StatusNotFound)
 }
