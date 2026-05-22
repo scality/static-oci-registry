@@ -39,6 +39,12 @@ func (c *Container) getHTTPRouter() http.Handler {
 					return
 				}
 
+				// OCI manifest pull endpoint (end-3 of the spec)
+				if strings.Contains(path, "/manifests/") {
+					c.getFetchManifestHandler().ServeHTTP(w, r)
+					return
+				}
+
 				// Unknown endpoint
 				http.NotFound(w, r)
 			})

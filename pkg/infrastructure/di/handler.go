@@ -9,3 +9,15 @@ func (c *Container) getListTagsHandler() *handler.ListTags {
 
 	return c.listTagsHandler
 }
+
+func (c *Container) getFetchManifestHandler() *handler.FetchManifest {
+	if c.fetchManifestHandler == nil {
+		c.fetchManifestHandler = handler.NewFetchManifest(
+			c.GetLogger(),
+			c.getFetchManifestFromTagUseCase(),
+			c.getFetchManifestFromDigestUseCase(),
+		)
+	}
+
+	return c.fetchManifestHandler
+}
