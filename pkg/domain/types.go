@@ -14,7 +14,7 @@ const (
 
 	// match a tag name
 	// e.g. latest, v1.0.0, 1.0.0-beta, my_tag-123.
-	imageTagRegex = `^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*$`
+	imageTagRegex = `^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$`
 
 	// match a digest
 	// digests follow this specific grammar
