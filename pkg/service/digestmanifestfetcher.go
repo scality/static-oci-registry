@@ -11,5 +11,5 @@ type DigestManifestFetcher interface {
 		ctx context.Context,
 		imageName domain.ImageName,
 		digest domain.Digest,
-	) (*domain.Manifest, error)
+	) (*domain.FetchManifestOutput, error)
 }

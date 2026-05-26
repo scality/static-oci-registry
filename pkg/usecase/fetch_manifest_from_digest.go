@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/service"
 )
@@ -28,6 +29,16 @@ func (uc *FetchManifestFromDigest) Execute(
 	imageName domain.ImageName,
 	digest domain.Digest,
 ) (*domain.FetchManifestOutput, error) {
-	// TODO: implement this use case
-	return nil, nil
+	l := uc.logger.With(
+		slog.String("image_name", string(imageName)),
+		slog.String("digest", string(digest)),
+	)
+	l.InfoContext(ctx, "Fetching manifest for digest")
+
+	fetchManifestOutput, err := uc.digestManifestFetcher.FetchManifest(ctx, imageName, digest)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.WithDetail("failed to fetch manifest from digest"))
+	}
+
+	return fetchManifestOutput, nil
 }

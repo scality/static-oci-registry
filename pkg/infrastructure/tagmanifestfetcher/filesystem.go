@@ -38,7 +38,7 @@ func NewFileSystem(
 }
 
 func (fs *FileSystem) FetchManifest(ctx context.Context, imageName domain.ImageName, tag domain.Tag) (
-	*domain.Manifest, error,
+	*domain.FetchManifestOutput, error,
 ) {
 	// TODO: implement this function
 	return nil, nil
