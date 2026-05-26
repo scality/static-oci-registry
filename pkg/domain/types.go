@@ -63,6 +63,24 @@ type (
 		Name ImageName `json:"name"`
 		Tags []Tag     `json:"tags"`
 	}
+
+	ManifestReference interface {
+		isManifestReference()
+		String() string
+		Validate() error
+	}
+
+	FetchManifestInput struct {
+		Name ImageName
+		Ref  ManifestReference
+		Head bool
+	}
+
+	FetchManifestOutput struct {
+		MediaType     string
+		ContentDigest Digest
+		ManifestBytes []byte
+	}
 )
 
 func (i ImageName) Validate() error {
@@ -97,9 +115,13 @@ func (t Tag) String() string {
 	return string(t)
 }
 
+func (t Tag) isManifestReference() {}
+
 func (d Digest) String() string {
 	return string(d)
 }
+
+func (d Digest) isManifestReference() {}
 
 // from the OCI distribution spec:
 // ` If the list is not empty, the tags MUST be in lexical order

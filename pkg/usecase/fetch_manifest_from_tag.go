@@ -27,7 +27,7 @@ func (uc *FetchManifestFromTag) Execute(
 	ctx context.Context,
 	imageName domain.ImageName,
 	tag domain.Tag,
-) (*domain.Manifest, error) {
+) (*domain.FetchManifestOutput, error) {
 	// TODO: implement this use case
 	return nil, nil
 }

@@ -37,7 +37,7 @@ func HandleError(ctx context.Context, w http.ResponseWriter, err error, l *slog.
 	if ociErr, ok := ocierrors.AsOCIError(err); ok {
 		errorResponse := NewErrorResponse()
 		errorResponse.AddError(*ociErr)
-		RespondWithJSON(ctx, w, errorResponse, http.StatusNotFound, l)
+		RespondWithJSON(ctx, w, errorResponse, nil, http.StatusNotFound, l)
 
 		return
 	}

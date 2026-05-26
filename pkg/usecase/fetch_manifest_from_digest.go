@@ -27,7 +27,7 @@ func (uc *FetchManifestFromDigest) Execute(
 	ctx context.Context,
 	imageName domain.ImageName,
 	digest domain.Digest,
-) (*domain.Manifest, error) {
+) (*domain.FetchManifestOutput, error) {
 	// TODO: implement this use case
 	return nil, nil
 }

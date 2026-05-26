@@ -35,7 +35,7 @@ func NewListTags(
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	listTagsInput, err := parseRequest(r)
+	listTagsInput, err := parseListTagRequest(r)
 	if err != nil {
 		httplayer.HandleError(ctx, w, err, h.logger)
 		return
@@ -47,13 +47,13 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httplayer.RespondWithJSON(ctx, w, listTagsOutput, http.StatusOK, h.logger)
+	httplayer.RespondWithJSON(ctx, w, listTagsOutput, nil, http.StatusOK, h.logger)
 }
 
 // nolint:funlen,gocognit // this function is long and complex because of all the
 // checks and path parsing logic, and cannot be meaningfully shortened or split
 // parses a query and return the input type for ListTags usecase.
-func parseRequest(r *http.Request) (*domain.ListTagsInput, error) {
+func parseListTagRequest(r *http.Request) (*domain.ListTagsInput, error) {
 	// Extract image name from URL path
 	// Path format: /v2/{image}/tags/list
 	// We use manual path parsing to support multi-level image names with slashes
