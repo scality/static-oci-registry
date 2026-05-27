@@ -34,5 +34,6 @@ go.work.sum
 # build output
 _build/
 _testfs/
+_certs/
 
 junit-*.xml
