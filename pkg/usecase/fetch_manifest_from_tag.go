@@ -1,3 +1,6 @@
+// but combining them would couple dispatch logic (tag vs. digest) to the usecase
+//
+//nolint:dupl //FetchManifestFromDigest and FetchManifestFromTag are very similar
 package usecase
 
 import (
