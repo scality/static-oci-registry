@@ -12,6 +12,7 @@ var (
 	ErrInvalidDigest             = errors.New("invalid digest")
 	ErrInvalidManifestDescriptor = errors.New("invalid manifest descriptor")
 	ErrInvalidManifest           = errors.New("invalid manifest")
+	ErrManifestNotFound          = errors.New("manifest not found in registry")
 	ErrInvalidReference          = errors.New("invalid or missing reference")
 	ErrRegistryInternal          = errors.New("there was an internal error in the registry")
 	ErrInvalidParameter          = errors.New("invalid parameter")

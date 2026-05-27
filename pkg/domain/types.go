@@ -32,7 +32,8 @@ const (
 	digestAlgorithmComponentRegex = `[a-z0-9]+`
 	digestAlgorithmRegex          = digestAlgorithmComponentRegex +
 		`(` + digestAlgorithmSeparatorRegex + digestAlgorithmComponentRegex + `)*`
-	digestRegex = `^` + digestAlgorithmRegex + `:` + digestEncodedRegex + `$`
+	digestRegex = `^(?P<algorithm>` + digestAlgorithmRegex +
+		`):(?P<encoded>` + digestEncodedRegex + `)$`
 )
 
 var (
@@ -107,6 +108,24 @@ func (d Digest) Validate() error {
 	return nil
 }
 
+func (d Digest) Algorithm() (string, error) {
+	matches := digestChecker.FindStringSubmatch(string(d))
+	if matches == nil {
+		return "", ErrInvalidDigest
+	}
+
+	return matches[digestChecker.SubexpIndex("algorithm")], nil
+}
+
+func (d Digest) Encoded() (string, error) {
+	matches := digestChecker.FindStringSubmatch(string(d))
+	if matches == nil {
+		return "", ErrInvalidDigest
+	}
+
+	return matches[digestChecker.SubexpIndex("encoded")], nil
+}
+
 func (i ImageName) String() string {
 	return string(i)
 }
@@ -115,13 +134,13 @@ func (t Tag) String() string {
 	return string(t)
 }
 
-func (t Tag) isManifestReference() {}
+func (Tag) isManifestReference() {}
 
 func (d Digest) String() string {
 	return string(d)
 }
 
-func (d Digest) isManifestReference() {}
+func (Digest) isManifestReference() {}
 
 // from the OCI distribution spec:
 // ` If the list is not empty, the tags MUST be in lexical order
