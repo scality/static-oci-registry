@@ -2,13 +2,11 @@ package unit
 
 import (
 	"context"
-	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
-	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/tagwalker"
 	"github.com/scality/static-oci-registry/test/utils"
@@ -16,92 +14,96 @@ import (
 
 var _ = Describe("List Tags", Ordered, func() {
 	var (
-		mockImageFinder *imagefinder.Mock
-		tagWalker       *tagwalker.FileSystem
-		tagLister       *taglister.FileSystem
-		re              *utils.RegistryEntry
+		mockWalker *tagwalker.Mock
+		tagLister  *taglister.FileSystem
+		image      domain.ImageName
 	)
 
 	BeforeAll(func() {
-		re = &utils.RegistryEntry{
-			Solution: "list-tags-solution",
-			Version:  "v1.0.0",
-			Image:    "docker.io/library/alpine",
-			Tag:      "3.22.2",
-		}
-		// mock the image finder with data from the fsRoot
-		mockImageFinder = imagefinder.NewMock()
-		mockImageFinder.AddImage(re.Solution, re.Version, re.Image)
+		image = "docker.io/library/alpine"
 
-		// finally, set up the tagLister
+		mockWalker = tagwalker.NewMock()
+
 		var err error
-
-		// set up the tag walker
-		tagWalker, err = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
+		tagLister, err = taglister.NewFileSystem(suite.Logger, mockWalker)
 		Expect(err).NotTo(HaveOccurred())
-
-		tagLister, err = taglister.NewFileSystem(suite.Logger, tagWalker)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	Context("Listing tags in a healthy FS", func() {
-		When("using an existing image", func() {
-			It("should return the correct tags", func() {
-				suite.FetchImage(re)
-
-				tags, err := tagLister.ListTags(context.Background(), re.Image)
-				Expect(err).NotTo(HaveOccurred())
-
-				// validate contents of tags list
-				Expect(tags).NotTo(BeNil())
-				Expect(tags.Name).To(BeEquivalentTo(re.Image))
-				Expect(tags.Tags).NotTo(BeEmpty())
-				Expect(tags.Tags).To(HaveLen(1))
-				Expect(tags.Tags).To(ContainElement(domain.Tag(re.Tag)))
-			})
-		})
-
-		When("using a non existant image", func() {
-			It("should return a not found error", func() {
-				_, err := tagLister.ListTags(context.Background(), "ghcr.io/nonexistent/image")
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrImageNotFound))
-			})
-		})
-	})
-
-	Context("Listing tags in an unhealthy fs", func() {
-		Context("Listing tags when ImageFinder fails", func() {
-			When("Listing tags for any image", func() {
-				It("should return an internal error", func() {
-					mockImageFinder.SetError(errors.Wrap(domain.ErrRegistryInternal))
-
-					_, err := tagLister.ListTags(context.Background(), re.Image)
-					Expect(err).To(HaveOccurred())
-					utils.ValidateError(err)
-					Expect(err).To(MatchError(domain.ErrRegistryInternal))
-				})
-			})
-		})
-
-		Context("Listing tags when reading image dir fails", func() {
-			When("Listing tags for an existing image with bad permissions", func() {
-				It("should return an internal error", func() {
-					suite.FetchImage(re)
-					os.Chmod(re.ImagePath(suite.FsRoot), utils.PermissionNoRead)
-
-					_, err := tagLister.ListTags(context.Background(), re.Image)
-					Expect(err).To(HaveOccurred())
-					utils.ValidateError(err)
-					Expect(err).To(MatchError(domain.ErrRegistryInternal))
-				})
-			})
-		})
 	})
 
 	AfterEach(func() {
-		suite.ClearImage(re)
-		mockImageFinder.RemoveErrors()
+		mockWalker.Reset()
+	})
+
+	entry := func(sol, ver, tag string) domain.TagEntry {
+		return domain.TagEntry{
+			SolutionVersion: domain.SolutionVersion{Solution: sol, Version: ver},
+			Name:            image,
+			Tag:             domain.Tag(tag),
+		}
+	}
+
+	Context("Happy paths", func() {
+		When("the walker yields several distinct tags", func() {
+			It("returns all of them, sorted", func() {
+				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.3"), nil)
+				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), nil)
+				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "latest"), nil)
+
+				out, err := tagLister.ListTags(context.Background(), image)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(out).NotTo(BeNil())
+				Expect(out.Name).To(Equal(image))
+				Expect(out.Tags).To(HaveLen(3))
+
+				Expect(out.Tags).To(BeEquivalentTo([]domain.Tag{"3.22.2", "3.22.3", "latest"}))
+			})
+		})
+
+		When("the same tag is yielded from multiple solution-versions", func() {
+			It("deduplicates", func() {
+				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), nil)
+				mockWalker.AddEntry(entry("sol-b", "v2.0.0", "3.22.2"), nil)
+
+				out, err := tagLister.ListTags(context.Background(), image)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(out.Tags).To(HaveLen(1))
+				Expect(out.Tags).To(ContainElement(domain.Tag("3.22.2")))
+			})
+		})
+
+		When("the walker yields no entries", func() {
+			It("returns an empty tag list without error", func() {
+				out, err := tagLister.ListTags(context.Background(), image)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(out).NotTo(BeNil())
+				Expect(out.Name).To(Equal(image))
+				Expect(out.Tags).To(BeEmpty())
+			})
+		})
+	})
+
+	Context("Error propagation", func() {
+		When("the walker yields an error", func() {
+			It("wraps it and preserves the sentinel", func() {
+				mockWalker.SetWalkError(errors.Wrap(domain.ErrRegistryInternal))
+
+				_, err := tagLister.ListTags(context.Background(), image)
+				Expect(err).To(HaveOccurred())
+				utils.ValidateError(err)
+				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+			})
+		})
+
+		When("the walker yields an ImageNotFound error", func() {
+			It("propagates the sentinel", func() {
+				mockWalker.SetWalkError(errors.Wrap(
+					domain.ErrImageNotFound,
+					errors.WithDetail("image not found in filesystem registry"),
+				))
+
+				_, err := tagLister.ListTags(context.Background(), image)
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(domain.ErrImageNotFound))
+			})
+		})
 	})
 })
