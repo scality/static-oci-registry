@@ -11,8 +11,7 @@ func (c *Container) getDigestManifestFetcher() *digestmanifestfetcher.FileSystem
 	if c.digestManifestFetcher == nil {
 		l, err := digestmanifestfetcher.NewFileSystem(
 			c.GetLogger(),
-			c.getImageFinder(),
-			c.config.FS.Root,
+			c.getTagWalker(),
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create digest manifest fetcher",

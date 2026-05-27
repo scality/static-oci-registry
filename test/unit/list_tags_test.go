@@ -10,12 +10,14 @@ import (
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/tagwalker"
 	"github.com/scality/static-oci-registry/test/utils"
 )
 
 var _ = Describe("List Tags", Ordered, func() {
 	var (
 		mockImageFinder *imagefinder.Mock
+		tagWalker       *tagwalker.FileSystem
 		tagLister       *taglister.FileSystem
 		re              *utils.RegistryEntry
 	)
@@ -34,7 +36,11 @@ var _ = Describe("List Tags", Ordered, func() {
 		// finally, set up the tagLister
 		var err error
 
-		tagLister, err = taglister.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
+		// set up the tag walker
+		tagWalker, err = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
+		Expect(err).NotTo(HaveOccurred())
+
+		tagLister, err = taglister.NewFileSystem(suite.Logger, tagWalker)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
@@ -15,116 +14,76 @@ import (
 )
 
 type FileSystem struct {
-	logger      *slog.Logger
-	imageFinder service.ImageFinder
-	fsRoot      string
+	logger    *slog.Logger
+	tagWalker service.TagWalker
 }
 
 func NewFileSystem(
 	l *slog.Logger,
-	i service.ImageFinder,
-	r string,
+	t service.TagWalker,
 ) (*FileSystem, error) {
-	info, err := os.Stat(r)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.WithDetail("unable to access FS_ROOT"))
-	}
-
-	if !info.IsDir() {
-		return nil, errors.New("passed FS_ROOT is not a directory")
-	}
-
 	return &FileSystem{
-		logger:      l.With(slog.String("tag_manifest_fetcher", "filesystem")),
-		imageFinder: i,
-		fsRoot:      r,
+		logger:    l.With(slog.String("tag_manifest_fetcher", "filesystem")),
+		tagWalker: t,
 	}, nil
 }
 
 // nolint:gocognit,funlen // this is the core function of this service
 // and can not be split meaningfully.
-func (fs *FileSystem) FetchManifest(ctx context.Context, imageName domain.ImageName, tag domain.Tag) (
-	*domain.FetchManifestOutput, error,
-) {
+func (fs *FileSystem) FetchManifest(
+	ctx context.Context,
+	imageName domain.ImageName,
+	tag domain.Tag,
+) (*domain.FetchManifestOutput, error) {
 	l := fs.logger.With(slog.String("image_name", string(imageName)), slog.String("tag", string(tag)))
 	l.InfoContext(ctx, "Finding manifest in filesystem registry")
 
-	candidates, err := fs.imageFinder.FindImage(ctx, imageName)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.WithDetail("failed to find image in filesystem registry"))
-	}
+	for entry, err := range fs.tagWalker.WalkTags(ctx, imageName) {
+		if err != nil {
+			return nil, errors.Wrap(
+				err,
+				errors.WithDetail("failure while walking tags in filesystem registry"),
+			)
+		}
 
-	for _, sv := range candidates {
-		dir := fs.fsRoot +
-			"/" + sv.Solution +
-			"/" + sv.Version +
-			"/" + string(imageName)
+		if entry.Tag != tag {
+			continue
+		}
 
-		tagEntries, err := os.ReadDir(dir)
+		manifestBytes, err := fs.tagWalker.ReadManifestBytes(entry)
 		if err != nil {
 			return nil, errors.Wrap(
 				domain.ErrRegistryInternal,
 				errors.CausedBy(err),
-				errors.WithDetail("failed to read an image dir in filesystem registry"),
+				errors.WithDetail("failed to read manifest bytes while walking tags in filesystem registry"),
 			)
 		}
 
-		for _, tagEntry := range tagEntries {
-			if tagEntry.Name() != string(tag) {
-				continue
-			}
+		var manifest domain.Manifest
 
-			if !tagEntry.IsDir() {
-				continue
-			}
-
-			manifestPath := dir + "/" + tagEntry.Name() + "/manifest.json"
-			if info, err := os.Stat(manifestPath); err != nil || info.IsDir() {
-				l.WarnContext(ctx, "skipping tag entry as it does not contain a manifest.json file",
-					slog.String("location", dir),
-					slog.String("tag", tagEntry.Name()),
-				)
-
-				continue
-			}
-
-			// load manifest content
-			manifestBytes, err := os.ReadFile(manifestPath)
-			if err != nil {
-				l.WarnContext(ctx, "skipping tag entry as manifest.json file could not be read",
-					slog.String("location", manifestPath),
-				)
-
-				continue
-			}
-
-			var manifest domain.Manifest
-
-			err = json.Unmarshal(manifestBytes, &manifest)
-			if err != nil {
-				l.WarnContext(ctx, "skipping tag entry as manifest.json file could not be unmarshalled",
-					slog.String("location", manifestPath),
-				)
-
-				continue
-			}
-
-			if err := manifest.Validate(); err != nil {
-				l.WarnContext(ctx, "skipping tag entry as manifest.json file is not a valid manifest",
-					slog.String("location", manifestPath),
-				)
-
-				continue
-			}
-
-			hash := sha256.Sum256(manifestBytes)
-
-			return &domain.FetchManifestOutput{
-				MediaType:     manifest.MediaType,
-				ContentDigest: domain.Digest(fmt.Sprintf("sha256:%x", string(hash[:]))),
-				ManifestBytes: manifestBytes,
-			}, nil
+		if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+			return nil, errors.Wrap(
+				domain.ErrRegistryInternal,
+				errors.CausedBy(err),
+				errors.WithDetail("failed to unmarshal manifest while walking tags in filesystem registry"),
+			)
 		}
+
+		if err := manifest.Validate(); err != nil {
+			return nil, errors.Wrap(
+				domain.ErrRegistryInternal,
+				errors.CausedBy(err),
+				errors.WithDetail("invalid manifest contents while walking tags in filesystem registry"),
+			)
+		}
+
+		hash := sha256.Sum256(manifestBytes)
+
+		return &domain.FetchManifestOutput{
+			MediaType:     manifest.MediaType,
+			ContentDigest: domain.Digest(fmt.Sprintf("sha256:%x", string(hash[:]))),
+			ManifestBytes: manifestBytes,
+		}, nil
 	}
 
 	return nil, errors.Wrap(
