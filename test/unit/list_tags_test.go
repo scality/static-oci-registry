@@ -25,6 +25,7 @@ var _ = Describe("List Tags", Ordered, func() {
 		mockWalker = tagwalker.NewMock()
 
 		var err error
+
 		tagLister, err = taglister.NewFileSystem(suite.Logger, mockWalker)
 		Expect(err).NotTo(HaveOccurred())
 	})

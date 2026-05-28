@@ -25,6 +25,7 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 		mockWalker = tagwalker.NewMock()
 
 		var err error
+
 		fetcher, err = digestmanifestfetcher.NewFileSystem(suite.Logger, mockWalker)
 		Expect(err).NotTo(HaveOccurred())
 	})

@@ -51,6 +51,7 @@ var _ = Describe("Walk Tags", Ordered, func() {
 		mockImageFinder = imagefinder.NewMock()
 
 		var err error
+
 		walker, err = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -69,7 +70,9 @@ var _ = Describe("Walk Tags", Ordered, func() {
 		}
 		// reset the mock between tests
 		mockImageFinder = imagefinder.NewMock()
+
 		var err2 error
+
 		walker, err2 = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
 		Expect(err2).NotTo(HaveOccurred())
 	})
@@ -146,8 +149,10 @@ var _ = Describe("Walk Tags", Ordered, func() {
 				writeTagDir(suite.FsRoot, "sol-a", "v1.0.0", image, "c")
 
 				count := 0
+
 				for _, err := range walker.WalkTags(context.Background(), image) {
 					Expect(err).NotTo(HaveOccurred())
+
 					count++
 
 					break
@@ -242,6 +247,7 @@ var _ = Describe("Walk Tags", Ordered, func() {
 
 				imageDir := filepath.Join(suite.FsRoot, "sol-a", "v1.0.0", string(image))
 				Expect(os.Chmod(imageDir, utils.PermissionNoRead)).To(Succeed())
+
 				defer func() { _ = os.Chmod(imageDir, utils.PermissionOK) }()
 
 				_, err := collectWalk(walker.WalkTags(context.Background(), image))
@@ -294,6 +300,7 @@ var _ = Describe("Walk Tags", Ordered, func() {
 					suite.FsRoot, "sol-a", "v1.0.0", string(image), "3.22.2", "manifest.json",
 				)
 				Expect(os.Chmod(manifestFile, utils.PermissionNone)).To(Succeed())
+
 				defer func() { _ = os.Chmod(manifestFile, utils.PermissionOK) }()
 
 				entry := domain.TagEntry{
