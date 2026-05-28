@@ -40,9 +40,13 @@ func TestIntegration(t *testing.T) {
 
 // nolint: unparam // This param will have different values in the future
 func initRequest(image, path string, params QueryParams) *http.Request {
+	return initRequestWithMethod(http.MethodGet, image, path, params)
+}
+
+func initRequestWithMethod(method, image, path string, params QueryParams) *http.Request {
 	sanitizedImage := strings.ReplaceAll(image, "/", "%2F")
 	url := "https://localhost" + cfg.HTTP.Addr + "/v2/" + sanitizedImage + path
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	q := req.URL.Query()
@@ -55,7 +59,10 @@ func initRequest(image, path string, params QueryParams) *http.Request {
 	return req
 }
 
-func execRequest(client *http.Client, req *http.Request) (*http.Response, []byte) {
+// execRequestRaw executes the request and returns the response body verbatim.
+// Required for endpoints whose body is content-addressed (e.g. manifests),
+// where every byte is significant to the Docker-Content-Digest header.
+func execRequestRaw(client *http.Client, req *http.Request) (*http.Response, []byte) {
 	resp, err := client.Do(req)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -64,7 +71,15 @@ func execRequest(client *http.Client, req *http.Request) (*http.Response, []byte
 	body, err := io.ReadAll(resp.Body)
 	Expect(err).NotTo(HaveOccurred())
 
-	// remove trailing newline if present
+	return resp, body
+}
+
+// execRequest executes the request and strips the trailing newline that
+// json.Encoder appends to JSON responses. Use for endpoints that respond
+// via RespondWithJSON; use execRequestRaw for verbatim bodies.
+func execRequest(client *http.Client, req *http.Request) (*http.Response, []byte) {
+	resp, body := execRequestRaw(client, req)
+
 	return resp, body[:len(body)-1]
 }
 
