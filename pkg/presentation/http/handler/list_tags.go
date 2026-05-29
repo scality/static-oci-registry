@@ -3,6 +3,7 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/scality/go-errors"
@@ -12,10 +13,9 @@ import (
 	"github.com/scality/static-oci-registry/pkg/usecase"
 )
 
-const (
-	listTagsPrefix = "/v2/"
-	listTagsSuffix = "/tags/list"
-)
+const listTagsURLPattern = `^/v2/(.+)/tags/list$`
+
+var listTagsURLRegex = regexp.MustCompile(listTagsURLPattern)
 
 type ListTags struct {
 	logger          *slog.Logger
@@ -30,6 +30,11 @@ func NewListTags(
 		listTagsUseCase: listTagsUseCase,
 		logger:          logger.With(slog.String("http_handler", "list_tags")),
 	}
+}
+
+// Matches reports whether the given request path is served by this handler.
+func (*ListTags) Matches(path string) bool {
+	return listTagsURLRegex.MatchString(path)
 }
 
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -56,13 +61,24 @@ func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func parseListTagRequest(r *http.Request) (*domain.ListTagsInput, error) {
 	// Extract image name from URL path
 	// Path format: /v2/{image}/tags/list
-	// We use manual path parsing to support multi-level image names with slashes
+	// use a regular expression to extract the image name
+	// since the image name can contain multiple levels of slashes
 	path := r.URL.Path
 
-	img := domain.ImageName("")
-	if len(path) > len(listTagsPrefix)+len(listTagsSuffix) {
-		img = domain.ImageName(path[len(listTagsPrefix) : len(path)-len(listTagsSuffix)])
+	matches := listTagsURLRegex.FindStringSubmatch(path)
+	if matches == nil {
+		return nil, errors.Wrap(
+			domain.ErrInvalidRequest,
+			errors.WithDetail("error parsing URL path in query parser"),
+			ocierrors.BuildOCIProperties(
+				ocierrors.Unsupported,
+				domain.ErrInvalidRequest.Error(),
+				map[string]string{"path": path},
+			),
+		)
 	}
+
+	img := domain.ImageName(matches[1])
 
 	err := img.Validate()
 	if err != nil {

@@ -199,16 +199,16 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 			})
 
 			When("the reference contains an unencoded slash", func() {
-				It("should return an UNSUPPORTED error", func() {
-					// the URL pattern requires the reference segment to contain no '/'
+				It("should fall through to a plain 404 (router does not match)", func() {
+					// the URL pattern requires the reference segment to contain no '/',
+					// so the router does not dispatch to the manifest handler at all.
 					url := "https://localhost" + cfg.HTTP.Addr + "/v2/" + string(image) + "/manifests/foo/bar"
 					req, err := http.NewRequest(http.MethodGet, url, nil)
 					Expect(err).NotTo(HaveOccurred())
 
-					resp, body := execRequest(client, req)
+					resp, _ := execRequestRaw(client, req)
 
 					Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-					checkErrorResponse(body, ocierrors.Unsupported)
 				})
 			})
 		})

@@ -12,9 +12,14 @@ import (
 	"github.com/scality/static-oci-registry/pkg/usecase"
 )
 
-const urlPattern = `^/v2/(.+)/manifests/([^/]+)$`
+const fetchManifestURLPattern = `^/v2/(.+)/manifests/([^/]+)$`
 
-var urlRegex = regexp.MustCompile(urlPattern)
+var fetchManifestURLRegex = regexp.MustCompile(fetchManifestURLPattern)
+
+// Matches reports whether the given request path is served by this handler.
+func (*FetchManifest) Matches(path string) bool {
+	return fetchManifestURLRegex.MatchString(path)
+}
 
 type FetchManifest struct {
 	logger                         *slog.Logger
@@ -96,7 +101,7 @@ func parseFetchManifestRequest(r *http.Request) (*domain.FetchManifestInput, err
 	// since the image name can contain multiple levels of slashes
 	path := r.URL.Path
 
-	matches := urlRegex.FindStringSubmatch(path)
+	matches := fetchManifestURLRegex.FindStringSubmatch(path)
 	if matches == nil {
 		return nil, errors.Wrap(
 			domain.ErrInvalidRequest,
