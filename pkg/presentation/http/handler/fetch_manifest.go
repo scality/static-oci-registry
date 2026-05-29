@@ -25,7 +25,6 @@ func (*FetchManifest) Matches(path string) bool {
 type FetchManifestInput struct {
 	Name domain.ImageName
 	Ref  domain.ManifestReference
-	Head bool
 }
 
 type FetchManifest struct {
@@ -86,12 +85,9 @@ func (h *FetchManifest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"Docker-Content-Digest": fetchManifestOutput.ContentDigest.String(),
 	}
 
-	if fetchManifestInput.Head {
-		for key, value := range headers {
-			w.Header().Set(key, value)
-		}
-
-		w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		httplayer.RespondNoBody(w, headers,
+			http.StatusOK, len(fetchManifestOutput.ManifestBytes))
 
 		return
 	}
@@ -163,6 +159,5 @@ func parseFetchManifestRequest(r *http.Request) (*FetchManifestInput, error) {
 	return &FetchManifestInput{
 		Name: img,
 		Ref:  ref,
-		Head: r.Method == http.MethodHead,
 	}, nil
 }

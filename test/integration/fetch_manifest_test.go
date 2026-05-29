@@ -223,6 +223,8 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 					Expect(resp.StatusCode).To(Equal(http.StatusOK))
 					Expect(resp.Header.Get("Docker-Content-Digest")).To(Equal(wantDigest.String()))
 					Expect(resp.Header.Get("Content-Type")).To(Equal(mediaType))
+					Expect(resp.Header.Get("Content-Length")).NotTo(BeEmpty(),
+						"HEAD must advertise Content-Length matching the GET body")
 					Expect(body).To(BeEmpty())
 				})
 			})
