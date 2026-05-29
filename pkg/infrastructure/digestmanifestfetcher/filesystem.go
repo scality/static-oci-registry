@@ -3,8 +3,10 @@ package digestmanifestfetcher
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"hash"
 	"log/slog"
 
 	"github.com/scality/go-errors"
@@ -12,6 +14,15 @@ import (
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 	"github.com/scality/static-oci-registry/pkg/service"
 )
+
+// supportedAlgorithms maps each supported digest algorithm to a constructor
+// for its hash.Hash. Real registries (Quay, MCR) return MANIFEST_UNKNOWN for
+// digests using algorithms they don't support; we mirror that behavior but
+// short-circuit the tag walk to avoid pointless I/O.
+var supportedAlgorithms = map[string]func() hash.Hash{
+	"sha256": sha256.New,
+	"sha512": sha512.New,
+}
 
 type FileSystem struct {
 	logger    *slog.Logger
@@ -40,6 +51,36 @@ func (fs *FileSystem) FetchManifest(
 		slog.String("digest", string(digest)),
 	)
 	l.InfoContext(ctx, "Finding manifest in filesystem registry")
+
+	// Check algorithm support up front: an unsupported algorithm can never
+	// match any of our manifests, so there is no point walking the tags.
+	// Real registries (Quay, MCR) return MANIFEST_UNKNOWN in this case,
+	// so we do the same.
+	algorithm, err := digest.Algorithm()
+	if err != nil {
+		return nil, errors.Wrap(err, errors.WithDetail("failed to get digest algorithm"))
+	}
+
+	newHash, supported := supportedAlgorithms[algorithm]
+	if !supported {
+		return nil, errors.Wrap(
+			domain.ErrManifestNotFound,
+			errors.WithDetail("unsupported digest algorithm"),
+			ocierrors.BuildOCIProperties(
+				ocierrors.ManifestUnknown,
+				domain.ErrManifestNotFound.Error(),
+				map[string]string{
+					"digest":    digest.String(),
+					"algorithm": algorithm,
+				},
+			),
+		)
+	}
+
+	encoded, err := digest.Encoded()
+	if err != nil {
+		return nil, errors.Wrap(err, errors.WithDetail("failed to get digest encoded value"))
+	}
 
 	for entry, err := range fs.tagWalker.WalkTags(ctx, imageName) {
 		if err != nil {
@@ -76,16 +117,7 @@ func (fs *FileSystem) FetchManifest(
 			)
 		}
 
-		match, err := digestMatchesManifest(digest, manifestBytes)
-		if err != nil {
-			l.WarnContext(ctx, "skipping tag entry as manifest digest could not be compared",
-				slog.Any("error", err),
-				slog.String("digest", string(digest)),
-			)
-
-			continue
-		}
-
+		match := digestMatchesManifest(newHash, encoded, manifestBytes)
 		if !match {
 			continue
 		}
@@ -110,26 +142,12 @@ func (fs *FileSystem) FetchManifest(
 	)
 }
 
-func digestMatchesManifest(digest domain.Digest, manifestBytes []byte) (bool, error) {
-	var sum []byte
+// digestMatchesManifest reports whether `manifestBytes` hashes to `encoded`
+// under the algorithm whose hash.Hash is produced by `newHash`. hash.Hash.Write
+// never returns an error (per its contract), so this function cannot fail.
+func digestMatchesManifest(newHash func() hash.Hash, encoded string, manifestBytes []byte) bool {
+	h := newHash()
+	h.Write(manifestBytes)
 
-	algorithm, err := digest.Algorithm()
-	if err != nil {
-		return false, errors.Wrap(err, errors.WithDetail("failed to get digest algorithm"))
-	}
-
-	encoded, err := digest.Encoded()
-	if err != nil {
-		return false, errors.Wrap(err, errors.WithDetail("failed to get digest encoded value"))
-	}
-
-	switch algorithm {
-	case "sha256":
-		h := sha256.Sum256(manifestBytes)
-		sum = h[:]
-	default:
-		return false, errors.New("unsupported hashing algorithm")
-	}
-
-	return hex.EncodeToString(sum) == encoded, nil
+	return hex.EncodeToString(h.Sum(nil)) == encoded
 }

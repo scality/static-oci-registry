@@ -79,6 +79,20 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 				Expect(out.ManifestBytes).To(BeEquivalentTo(targetBytes))
 			})
 		})
+
+		When("a walker entry's manifest hashes to the requested sha512 digest", func() {
+			It("returns the manifest with the requested digest echoed back", func() {
+				bytes := []byte(validManifestJSON)
+				wantDigest := sha512Digest(bytes)
+
+				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), bytes)
+
+				out, err := fetcher.FetchManifest(context.Background(), image, wantDigest)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(out.ContentDigest).To(Equal(wantDigest))
+				Expect(out.ManifestBytes).To(Equal(bytes))
+			})
+		})
 	})
 
 	Context("Not found cases", func() {
@@ -105,12 +119,12 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 		})
 
 		When("the requested digest uses an unsupported algorithm", func() {
-			It("logs, continues, and returns ErrManifestNotFound", func() {
+			It("returns ErrManifestNotFound without walking", func() {
 				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte(validManifestJSON))
-				// sha512 is grammar-valid but unsupported by the fetcher
-				unsupported := domain.Digest("sha512:" +
-					"00000000000000000000000000000000000000000000000000000000000000000000" +
-					"00000000000000000000000000000000000000000000000000000000000000")
+				// sha384 is grammar-valid but unsupported by the fetcher.
+				unsupported := domain.Digest("sha384:" +
+					"000000000000000000000000000000000000000000000000" +
+					"000000000000000000000000000000000000000000000000")
 
 				_, err := fetcher.FetchManifest(context.Background(), image, unsupported)
 				Expect(err).To(HaveOccurred())

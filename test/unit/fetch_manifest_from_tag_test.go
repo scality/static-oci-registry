@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,6 +32,11 @@ const validManifestJSON = `{` +
 func sha256Digest(bytes []byte) domain.Digest {
 	h := sha256.Sum256(bytes)
 	return domain.Digest(fmt.Sprintf("sha256:%x", h[:]))
+}
+
+func sha512Digest(bytes []byte) domain.Digest {
+	h := sha512.Sum512(bytes)
+	return domain.Digest(fmt.Sprintf("sha512:%x", h[:]))
 }
 
 var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
