@@ -67,15 +67,11 @@ func parseListTagRequest(r *http.Request) (*domain.ListTagsInput, error) {
 
 	matches := listTagsURLRegex.FindStringSubmatch(path)
 	if matches == nil {
-		return nil, errors.Wrap(
-			domain.ErrInvalidRequest,
-			errors.WithDetail("error parsing URL path in query parser"),
-			ocierrors.BuildOCIProperties(
-				ocierrors.Unsupported,
-				domain.ErrInvalidRequest.Error(),
-				map[string]string{"path": path},
-			),
-		)
+		// Unreachable: the router only dispatches to this handler when
+		// ListTags.Matches(path) returns true, which uses the same regex.
+		// A nil result here means the router and handler are out of sync
+		// — a programming error, not a client error.
+		panic("list_tags: router/handler regex mismatch for path " + path)
 	}
 
 	img := domain.ImageName(matches[1])
@@ -98,57 +94,25 @@ func parseListTagRequest(r *http.Request) (*domain.ListTagsInput, error) {
 
 	q := r.URL.Query()
 
+	// Bad `last`/`n` query parameters are silently ignored, matching the
+	// behavior of real registries (Quay, MCR) which return the full sorted
+	// list instead of erroring on malformed pagination input.
 	last := q.Get("last")
 	if last != "" {
 		lastTag := domain.Tag(last)
-
-		err := lastTag.Validate()
-		if err != nil {
-			return nil, errors.Wrap(
-				err,
-				errors.WithDetail("error validating last tag in query parser"),
-				ocierrors.BuildOCIProperties(
-					ocierrors.Unsupported,
-					err.Error(),
-					map[string]string{"last": last},
-				),
-			)
+		if err := lastTag.Validate(); err == nil {
+			listTagsInput.Last = &lastTag
 		}
-
-		listTagsInput.Last = &lastTag
 	}
 
 	n := q.Get("n")
 	if n != "" {
-		nint, err := strconv.ParseInt(n, 0, 0)
-		if err != nil {
-			return nil, errors.Wrap(
-				domain.ErrInvalidParameter,
-				errors.WithDetail("error validating n parameter in query parser"),
-				ocierrors.BuildOCIProperties(
-					ocierrors.Unsupported,
-					"Invalid integer value in n parameter",
-					map[string]string{"n": n},
-				),
-				errors.CausedBy(err),
-			)
+		if nint, err := strconv.ParseInt(n, 0, 0); err == nil {
+			tagLimit := int(nint)
+			if tagLimit >= 0 && tagLimit <= 1000 {
+				listTagsInput.N = &tagLimit
+			}
 		}
-
-		tagLimit := int(nint)
-
-		if tagLimit < 0 || tagLimit > 1000 {
-			return nil, errors.Wrap(
-				domain.ErrInvalidParameter,
-				errors.WithDetail("n parameter is out of range in query parser"),
-				ocierrors.BuildOCIProperties(
-					ocierrors.Unsupported,
-					"n parameter must be between 0 and 1000",
-					map[string]string{"n": strconv.Itoa(tagLimit)},
-				),
-			)
-		}
-
-		listTagsInput.N = &tagLimit
 	}
 
 	return listTagsInput, nil

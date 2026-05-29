@@ -103,15 +103,11 @@ func parseFetchManifestRequest(r *http.Request) (*domain.FetchManifestInput, err
 
 	matches := fetchManifestURLRegex.FindStringSubmatch(path)
 	if matches == nil {
-		return nil, errors.Wrap(
-			domain.ErrInvalidRequest,
-			errors.WithDetail("error parsing URL path in query parser"),
-			ocierrors.BuildOCIProperties(
-				ocierrors.Unsupported,
-				domain.ErrInvalidRequest.Error(),
-				map[string]string{"path": path},
-			),
-		)
+		// Unreachable: the router only dispatches to this handler when
+		// FetchManifest.Matches(path) returns true, which uses the same
+		// regex. A nil result here means the router and handler are out
+		// of sync — a programming error, not a client error.
+		panic("fetch_manifest: router/handler regex mismatch for path " + path)
 	}
 
 	img := domain.ImageName(matches[1])

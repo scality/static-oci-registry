@@ -7,7 +7,6 @@ import (
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
-	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 	"github.com/scality/static-oci-registry/pkg/service"
 )
 
@@ -38,20 +37,15 @@ func (uc *ListTags) Execute(ctx context.Context, input domain.ListTagsInput) (
 	}
 
 	if input.Last != nil {
-		if !slices.Contains(listTagsOutput.Tags, *input.Last) {
-			return nil, errors.Wrap(
-				domain.ErrTagNotFound,
-				ocierrors.BuildOCIProperties(
-					ocierrors.Unsupported,
-					domain.ErrTagNotFound.Error(),
-					map[string]string{"last": string(*input.Last)},
-				),
-			)
+		// Mirror the reference distribution registry
+		// (distribution/distribution, registry/handlers/tags.go): if `last`
+		// is not in the (sorted) tag list, return the full list unchanged
+		// rather than an error. The OCI v1.0.1 spec does not define an
+		// error code for an unknown `last` value, so the previous
+		// UNSUPPORTED response was a misuse.
+		if i := slices.Index(listTagsOutput.Tags, *input.Last); i >= 0 {
+			listTagsOutput.Tags = listTagsOutput.Tags[i+1:]
 		}
-
-		// return tags after lastTag without lastTag
-		i := slices.Index(listTagsOutput.Tags, *input.Last)
-		listTagsOutput.Tags = listTagsOutput.Tags[i+1:]
 	}
 
 	if input.N != nil {
