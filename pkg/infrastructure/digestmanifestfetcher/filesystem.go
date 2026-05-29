@@ -19,6 +19,8 @@ import (
 // for its hash.Hash. Real registries (Quay, MCR) return MANIFEST_UNKNOWN for
 // digests using algorithms they don't support; we mirror that behavior but
 // short-circuit the tag walk to avoid pointless I/O.
+//
+// nolint:gochecknoglobals // package-level lookup table; effectively a const.
 var supportedAlgorithms = map[string]func() hash.Hash{
 	"sha256": sha256.New,
 	"sha512": sha512.New,
@@ -158,7 +160,7 @@ func (fs *FileSystem) FetchManifest(
 // never returns an error (per its contract), so this function cannot fail.
 func digestMatchesManifest(newHash func() hash.Hash, encoded string, manifestBytes []byte) bool {
 	h := newHash()
-	h.Write(manifestBytes)
+	_, _ = h.Write(manifestBytes)
 
 	return hex.EncodeToString(h.Sum(nil)) == encoded
 }
