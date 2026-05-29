@@ -21,6 +21,12 @@ func (*FetchManifest) Matches(path string) bool {
 	return fetchManifestURLRegex.MatchString(path)
 }
 
+type FetchManifestInput struct {
+	Name domain.ImageName
+	Ref  domain.ManifestReference
+	Head bool
+}
+
 type FetchManifest struct {
 	logger                         *slog.Logger
 	fetchManifestFromTagUseCase    *usecase.FetchManifestFromTag
@@ -94,7 +100,7 @@ func (h *FetchManifest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // nolint:funlen,gocognit // this function is long and complex because of all the
 // checks and path parsing logic, and cannot be meaningfully shortened or split
 // parses a query and return the input type for FetchManifest usecase.
-func parseFetchManifestRequest(r *http.Request) (*domain.FetchManifestInput, error) {
+func parseFetchManifestRequest(r *http.Request) (*FetchManifestInput, error) {
 	// Extract image name and ref from URL path
 	// Path format: /v2/{image}/manifests/{reference}
 	// use a regular expression to extract the image name and reference
@@ -151,7 +157,7 @@ func parseFetchManifestRequest(r *http.Request) (*domain.FetchManifestInput, err
 		)
 	}
 
-	return &domain.FetchManifestInput{
+	return &FetchManifestInput{
 		Name: img,
 		Ref:  ref,
 		Head: r.Method == http.MethodHead,

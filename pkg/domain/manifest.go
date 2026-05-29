@@ -11,14 +11,14 @@ type (
 		Size         int64             `json:"size"`
 		URLs         []string          `json:"urls,omitempty"`
 		Annotations  map[string]string `json:"annotations,omitempty"`
-		Data         string            `json:"data,omitempty"`
-		ArtifactType string            `json:"artifactType,omitempty"`
+		Data         *string           `json:"data,omitempty"`
+		ArtifactType *string           `json:"artifactType,omitempty"`
 	}
 
 	Manifest struct {
-		SchemaVersion int    `json:"schemaVersion"`
-		MediaType     string `json:"mediaType"`
-		ArtifactType  string `json:"artifactType,omitempty"`
+		SchemaVersion int     `json:"schemaVersion"`
+		MediaType     string  `json:"mediaType"`
+		ArtifactType  *string `json:"artifactType,omitempty"`
 		// config is non-optional for image manifests but optional for other artifacts
 		// this is a pull-only registry, so this shouldn't be an issue to keep non-optional
 		Config      *ManifestDescriptor  `json:"config"`

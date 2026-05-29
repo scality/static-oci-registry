@@ -77,12 +77,6 @@ type (
 		Validate() error
 	}
 
-	FetchManifestInput struct {
-		Name ImageName
-		Ref  ManifestReference
-		Head bool
-	}
-
 	FetchManifestOutput struct {
 		MediaType     string
 		ContentDigest Digest
