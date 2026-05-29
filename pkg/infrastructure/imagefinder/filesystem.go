@@ -129,10 +129,13 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 			)
 			if err != nil {
 				if !os.IsNotExist(err) {
-					return nil, errors.Wrap(
-						domain.ErrRegistryInternal,
-						errors.CausedBy(err),
-						errors.WithDetail("failed to stat image dir in filesystem registry"),
+					// Soft-fail: a single unstattable image dir shouldn't
+					// abort the whole search. Log and skip; if no candidate
+					// exists at all the caller returns NAME_UNKNOWN.
+					l.WarnContext(ctx, "failed to stat image dir, skipping candidate",
+						slog.String("solution", solution.Name()),
+						slog.String("version", candidate.Name()),
+						slog.Any("error", err),
 					)
 				}
 

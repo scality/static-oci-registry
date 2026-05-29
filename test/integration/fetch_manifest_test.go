@@ -286,7 +286,7 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 		})
 
 		When("the manifest file is unreadable", func() {
-			It("should return a 500 error", func() {
+			It("should soft-fail and return 404 MANIFEST_UNKNOWN", func() {
 				if os.Geteuid() == 0 {
 					Skip("permission-based test skipped when running as root")
 				}
@@ -300,13 +300,13 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-				Expect(body).To(BeEmpty(), string(body))
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(string(body)).To(ContainSubstring("MANIFEST_UNKNOWN"))
 			})
 		})
 
 		When("the manifest file contains invalid JSON", func() {
-			It("should return a 500 error", func() {
+			It("should soft-fail and return 404 MANIFEST_UNKNOWN", func() {
 				manifestFile := filepath.Join(re.FullPath(suite.FsRoot), "manifest.json")
 				Expect(os.WriteFile(manifestFile, []byte("not json at all"), 0o600)).To(Succeed())
 
@@ -314,13 +314,13 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-				Expect(body).To(BeEmpty(), string(body))
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(string(body)).To(ContainSubstring("MANIFEST_UNKNOWN"))
 			})
 		})
 
 		When("the manifest fails schema validation", func() {
-			It("should return a 500 error", func() {
+			It("should soft-fail and return 404 MANIFEST_UNKNOWN", func() {
 				manifestFile := filepath.Join(re.FullPath(suite.FsRoot), "manifest.json")
 				// schemaVersion 1 is invalid (must be 2 per domain.Manifest.Validate)
 				Expect(os.WriteFile(manifestFile, []byte(`{"schemaVersion":1}`), 0o600)).To(Succeed())
@@ -329,8 +329,8 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-				Expect(body).To(BeEmpty(), string(body))
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(string(body)).To(ContainSubstring("MANIFEST_UNKNOWN"))
 			})
 		})
 	})

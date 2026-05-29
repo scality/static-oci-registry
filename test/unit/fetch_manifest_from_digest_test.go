@@ -148,7 +148,7 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 		})
 
 		When("ReadManifestBytes fails", func() {
-			It("returns a wrapped RegistryInternal error", func() {
+			It("skips the entry and returns ManifestNotFound", func() {
 				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte(validManifestJSON))
 				mockWalker.SetReadError(errors.Wrap(domain.ErrRegistryInternal))
 
@@ -156,31 +156,31 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 					sha256Digest([]byte(validManifestJSON)))
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+				Expect(err).To(MatchError(domain.ErrManifestNotFound))
 			})
 		})
 
 		When("the manifest bytes are not valid JSON", func() {
-			It("returns a wrapped RegistryInternal error", func() {
+			It("skips the entry and returns ManifestNotFound", func() {
 				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte("not json"))
 
 				_, err := fetcher.FetchManifest(context.Background(), image,
 					sha256Digest([]byte("not json")))
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+				Expect(err).To(MatchError(domain.ErrManifestNotFound))
 			})
 		})
 
 		When("the manifest fails domain validation", func() {
-			It("returns a wrapped RegistryInternal error", func() {
+			It("skips the entry and returns ManifestNotFound", func() {
 				badBytes := []byte(`{"schemaVersion":1}`)
 				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), badBytes)
 
 				_, err := fetcher.FetchManifest(context.Background(), image, sha256Digest(badBytes))
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+				Expect(err).To(MatchError(domain.ErrManifestNotFound))
 			})
 		})
 	})

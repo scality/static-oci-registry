@@ -237,7 +237,7 @@ var _ = Describe("Walk Tags", Ordered, func() {
 		})
 
 		When("the image directory is unreadable", func() {
-			It("yields a RegistryInternal error", func() {
+			It("skips it and yields no entries (no error)", func() {
 				if os.Geteuid() == 0 {
 					Skip("permission-based test skipped when running as root")
 				}
@@ -250,10 +250,9 @@ var _ = Describe("Walk Tags", Ordered, func() {
 
 				defer func() { _ = os.Chmod(imageDir, utils.PermissionOK) }()
 
-				_, err := collectWalk(walker.WalkTags(context.Background(), image))
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+				entries, err := collectWalk(walker.WalkTags(context.Background(), image))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(entries).To(BeEmpty())
 			})
 		})
 	})

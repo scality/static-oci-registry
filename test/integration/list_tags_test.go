@@ -217,7 +217,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 		})
 
 		When("the image directory has bad permissions", func() {
-			It("should return a 500 error", func() {
+			It("should soft-fail and return 200 with an empty tag list", func() {
 				suite.FetchImage(re)
 
 				os.Chmod(re.ImagePath(suite.FsRoot), utils.PermissionNoRead)
@@ -226,14 +226,13 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-
-				Expect(body).To(BeEmpty(), string(body))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(string(body)).To(ContainSubstring(`"tags":null`))
 			})
 		})
 
 		When("the image directory is not readable", func() {
-			It("should return a 500 error", func() {
+			It("should soft-fail and still return the healthy tags", func() {
 				suite.FetchImage(re)
 
 				// copy the struct by dereferencing the pointer so we don't change the original
@@ -245,9 +244,8 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-
-				Expect(body).To(BeEmpty(), string(body))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(string(body)).To(ContainSubstring(re.Tag))
 			})
 		})
 

@@ -92,29 +92,40 @@ func (fs *FileSystem) FetchManifest(
 
 		manifestBytes, err := fs.tagWalker.ReadManifestBytes(entry)
 		if err != nil {
-			return nil, errors.Wrap(
-				domain.ErrRegistryInternal,
-				errors.CausedBy(err),
-				errors.WithDetail("failed to read manifest bytes while walking tags in filesystem registry"),
+			// Soft-fail: skip unreadable manifests; if none match the caller
+			// will return MANIFEST_UNKNOWN.
+			l.WarnContext(ctx, "failed to read manifest bytes, skipping tag entry",
+				slog.String("solution", entry.Solution),
+				slog.String("version", entry.Version),
+				slog.String("tag", entry.Tag.String()),
+				slog.Any("error", err),
 			)
+
+			continue
 		}
 
 		var manifest domain.Manifest
 
 		if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
-			return nil, errors.Wrap(
-				domain.ErrRegistryInternal,
-				errors.CausedBy(err),
-				errors.WithDetail("failed to unmarshal manifest while walking tags in filesystem registry"),
+			l.WarnContext(ctx, "failed to unmarshal manifest, skipping tag entry",
+				slog.String("solution", entry.Solution),
+				slog.String("version", entry.Version),
+				slog.String("tag", entry.Tag.String()),
+				slog.Any("error", err),
 			)
+
+			continue
 		}
 
 		if err := manifest.Validate(); err != nil {
-			return nil, errors.Wrap(
-				domain.ErrRegistryInternal,
-				errors.CausedBy(err),
-				errors.WithDetail("invalid manifest contents while walking tags in filesystem registry"),
+			l.WarnContext(ctx, "invalid manifest contents, skipping tag entry",
+				slog.String("solution", entry.Solution),
+				slog.String("version", entry.Version),
+				slog.String("tag", entry.Tag.String()),
+				slog.Any("error", err),
 			)
+
+			continue
 		}
 
 		match := digestMatchesManifest(newHash, encoded, manifestBytes)

@@ -67,13 +67,15 @@ func (fs *FileSystem) WalkTags(
 
 			tagEntries, err := os.ReadDir(dir)
 			if err != nil {
-				yield(domain.TagEntry{}, errors.Wrap(
-					domain.ErrRegistryInternal,
-					errors.CausedBy(err),
-					errors.WithDetail("failed to read an image dir in filesystem registry"),
-				))
+				// Soft-fail: a single unreadable image dir shouldn't abort the
+				// whole walk. Log and skip; if no candidate yields a match the
+				// caller will return a normal not-found.
+				l.WarnContext(ctx, "failed to read an image dir, skipping",
+					slog.String("location", dir),
+					slog.Any("error", err),
+				)
 
-				return
+				continue
 			}
 
 			for _, entry := range tagEntries {

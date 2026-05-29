@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -64,9 +65,11 @@ func (h *FetchManifest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fetchManifestOutput, err = h.fetchManifestFromDigestUseCase.Execute(
 			ctx, fetchManifestInput.Name, ref)
 	default:
-		// this should never happen
-		httplayer.HandleError(ctx, w, domain.ErrRegistryInternal, h.logger)
-		return
+		// Unreachable: parseFetchManifestRequest only produces Tag or Digest
+		// for FetchManifestInput.Ref. Any other type indicates a programming
+		// error in the parser, not a runtime condition; fail loudly instead
+		// of papering over it with a 500.
+		panic(fmt.Sprintf("unreachable: unknown ManifestReference type %T", ref))
 	}
 
 	// failure in a usecase
