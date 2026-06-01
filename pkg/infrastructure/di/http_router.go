@@ -21,6 +21,7 @@ func (c *Container) getHTTPRouter() http.Handler {
 		httpRouter.Handle("/v2/", apphttp.NewV2Router(
 			c.getListTagsHandler(),
 			c.getFetchManifestHandler(),
+			c.getPullBlobHandler(),
 		))
 
 		c.router = httpRouter

@@ -21,3 +21,11 @@ func (c *Container) getFetchManifestHandler() *handler.FetchManifest {
 
 	return c.fetchManifestHandler
 }
+
+func (c *Container) getPullBlobHandler() *handler.PullBlob {
+	if c.pullBlobHandler == nil {
+		c.pullBlobHandler = handler.NewPullBlob(c.GetLogger(), c.getPullBlobUseCase())
+	}
+
+	return c.pullBlobHandler
+}
