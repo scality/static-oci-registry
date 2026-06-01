@@ -12,6 +12,7 @@ func (c *Container) getBlobPuller() *blobpuller.FileSystem {
 		p, err := blobpuller.NewFileSystem(
 			c.GetLogger(),
 			c.getTagWalker(),
+			c.config.FS.Root,
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create blob puller",

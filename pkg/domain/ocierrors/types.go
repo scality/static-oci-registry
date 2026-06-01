@@ -17,7 +17,7 @@ type OCIError struct {
 }
 
 const (
-	// BlobUnknown          OCIErrorCode = "BLOB_UNKNOWN"
+	BlobUnknown OCIErrorCode = "BLOB_UNKNOWN"
 	// BlobUploadInvalid    OCIErrorCode = "BLOB_UPLOAD_INVALID"
 	// BlobUploadUnknown    OCIErrorCode = "BLOB_UPLOAD_UNKNOWN".
 	DigestInvalid OCIErrorCode = "DIGEST_INVALID"
