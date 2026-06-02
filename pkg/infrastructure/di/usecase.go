@@ -12,3 +12,25 @@ func (c *Container) getListTagsUseCase() *usecase.ListTags {
 
 	return c.listTagsUseCase
 }
+
+func (c *Container) getFetchManifestFromTagUseCase() *usecase.FetchManifestFromTag {
+	if c.fetchManifestFromTagUseCase == nil {
+		c.fetchManifestFromTagUseCase = usecase.NewFetchManifestFromTag(
+			c.GetLogger(),
+			c.getTagManifestFetcher(),
+		)
+	}
+
+	return c.fetchManifestFromTagUseCase
+}
+
+func (c *Container) getFetchManifestFromDigestUseCase() *usecase.FetchManifestFromDigest {
+	if c.fetchManifestFromDigestUseCase == nil {
+		c.fetchManifestFromDigestUseCase = usecase.NewFetchManifestFromDigest(
+			c.GetLogger(),
+			c.getDigestManifestFetcher(),
+		)
+	}
+
+	return c.fetchManifestFromDigestUseCase
+}

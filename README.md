@@ -5,10 +5,15 @@ for Pull and Discovery. Written in Go.
 
 ## Endpoints
 
-| Method         | API Endpoint           | Success     | Failure           | Params  |
-| -------------- | ---------------------- | ----------- | ----------------- | ------- |
-| `GET`          | `/v2/`                 | `200`       | `404`/`401`       |         |
-| `GET`          | `/v2/<name>/tags/list` | `200`       | `404`             | n, last |
+| Method         | API Endpoint                       | Success     | Failure           | Params  |
+| -------------- | ---------------------------------- | ----------- | ----------------- | ------- |
+| `GET`          | `/v2/`                             | `200`       | `404`/`401`       |         |
+| `GET`          | `/v2/<name>/tags/list`             | `200`       | `404`             | n, last |
+| `GET`, `HEAD`  | `/v2/<name>/manifests/<reference>` | `200`       | `404`             |         |
+
+`<reference>` may be either a tag or a digest (e.g. `sha256:<hex>`). On success,
+responses include the `Docker-Content-Digest` and `Content-Type` headers; `HEAD`
+returns the same headers with an empty body.
 
 ## Environment variables
 

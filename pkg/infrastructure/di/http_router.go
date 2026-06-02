@@ -2,7 +2,8 @@ package di
 
 import (
 	"net/http"
-	"strings"
+
+	apphttp "github.com/scality/static-oci-registry/pkg/presentation/http"
 )
 
 // getHTTPRouter returns the main HTTP router with all endpoints configured.
@@ -11,42 +12,23 @@ func (c *Container) getHTTPRouter() http.Handler {
 		httpRouter := http.NewServeMux()
 
 		// Healthcheck endpoint for liveness status
-		httpRouter.HandleFunc("/healthz", func(writer http.ResponseWriter, _ *http.Request) {
-			writer.WriteHeader(http.StatusOK)
-		})
+		httpRouter.HandleFunc("/healthz", okHandler)
 
 		// Healthcheck endpoint for kubernetes startup probe
-		httpRouter.HandleFunc("/readyz", func(writer http.ResponseWriter, _ *http.Request) {
-			writer.WriteHeader(http.StatusOK)
-		})
+		httpRouter.HandleFunc("/readyz", okHandler)
 
 		// OCI endpoints under /v2/
-		// Use prefix pattern to support multi-level image names with slashes
-		// This supports multi-level image names with unencoded slashes.
-		getV2Router := func() http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				path := r.URL.Path
-
-				// OCI healthcheck endpoint (end-1 of the spec)
-				if path == "/v2/" {
-					w.WriteHeader(http.StatusOK)
-					return
-				}
-
-				// OCI tag list endpoint (end-8a and 8b of the spec)
-				if strings.HasSuffix(path, "/tags/list") {
-					c.getListTagsHandler().ServeHTTP(w, r)
-					return
-				}
-
-				// Unknown endpoint
-				http.NotFound(w, r)
-			})
-		}
-		httpRouter.Handle("/v2/", getV2Router())
+		httpRouter.Handle("/v2/", apphttp.NewV2Router(
+			c.getListTagsHandler(),
+			c.getFetchManifestHandler(),
+		))
 
 		c.router = httpRouter
 	}
 
 	return c.router
+}
+
+func okHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }

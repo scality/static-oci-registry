@@ -35,7 +35,7 @@ func (m *Mock) FindImage(_ context.Context, imageName domain.ImageName) (
 		domain.ErrImageNotFound,
 		errors.WithDetail("image not found in filesystem registry"),
 		ocierrors.BuildOCIProperties(
-			ocierrors.Unsupported,
+			ocierrors.NameUnknown,
 			domain.ErrImageNotFound.Error(),
 			map[string]string{"image_name": string(imageName)},
 		),

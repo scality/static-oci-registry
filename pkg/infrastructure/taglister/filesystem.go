@@ -4,7 +4,6 @@ package taglister
 import (
 	"context"
 	"log/slog"
-	"os"
 	"slices"
 
 	"github.com/scality/go-errors"
@@ -13,103 +12,43 @@ import (
 )
 
 type FileSystem struct {
-	logger      *slog.Logger
-	imageFinder service.ImageFinder
-	fsRoot      string
+	logger    *slog.Logger
+	tagWalker service.TagWalker
 }
 
 func NewFileSystem(
 	l *slog.Logger,
-	i service.ImageFinder,
-	r string,
+	t service.TagWalker,
 ) (*FileSystem, error) {
-	// make sure r exists
-	info, err := os.Stat(r)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.WithDetail("unable to access FS_ROOT"))
-	}
-
-	// make sure r is a directory
-	if !info.IsDir() {
-		return nil, errors.New("passed FS_ROOT is not a directory")
-	}
-
 	return &FileSystem{
-		logger:      l.With(slog.String("tag_lister", "filesystem")),
-		imageFinder: i,
-		fsRoot:      r,
+		logger:    l.With(slog.String("tag_lister", "filesystem")),
+		tagWalker: t,
 	}, nil
 }
 
-// nolint:gocognit,funlen // this is the core function of this service
-// and can not be split meaningfully.
 func (fs *FileSystem) ListTags(ctx context.Context, imageName domain.ImageName) (
 	*domain.ListTagsOutput, error,
 ) {
 	l := fs.logger.With(slog.String("image_name", string(imageName)))
 	l.InfoContext(ctx, "Finding tags in filesystem registry")
-	// the registry is stored in the filesystem at fsRoot
-	candidates, err := fs.imageFinder.FindImage(ctx, imageName)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.WithDetail("failed to find image in filesystem registry"))
-	}
 
-	allTags := make([]domain.Tag, 0, len(candidates))
+	var allTags []domain.Tag
 
-	for _, sv := range candidates {
-		dir := fs.fsRoot +
-			"/" + sv.Solution +
-			"/" + sv.Version +
-			"/" + string(imageName)
-
-		tagEntries, err := os.ReadDir(dir)
+	for entry, err := range fs.tagWalker.WalkTags(ctx, imageName) {
 		if err != nil {
 			return nil, errors.Wrap(
-				domain.ErrRegistryInternal,
-				errors.CausedBy(err),
-				errors.WithDetail("failed to read an image dir in filesystem registry"),
+				err,
+				errors.WithDetail("failure while walking tags in filesystem registry"),
 			)
 		}
 
-		for _, entry := range tagEntries {
-			if !entry.IsDir() {
-				continue
-			}
+		if slices.Contains(allTags, entry.Tag) {
+			l.With(slog.String("tag", entry.Tag.String())).WarnContext(ctx, "duplicate tag found, skipping")
 
-			// make sure this directory contains a manifest.json file
-			manifestPath := dir + "/" + entry.Name() + "/manifest.json"
-			if info, err := os.Stat(manifestPath); err != nil || info.IsDir() {
-				l.WarnContext(ctx, "location/tag directory does not contain manifest.json file",
-					slog.String("location", dir),
-					slog.String("tag", entry.Name()),
-				)
-
-				continue
-			}
-
-			tag := domain.Tag(entry.Name())
-			tl := l.With(
-				slog.String("location", dir),
-				slog.String("tag", string(tag)),
-			)
-
-			err := tag.Validate()
-			if err != nil {
-				tl.WarnContext(ctx, "invalid tag found, skipping",
-					slog.Any("error", err),
-				)
-
-				continue
-			}
-
-			if slices.Contains(allTags, tag) {
-				tl.WarnContext(ctx, "duplicate tag found, skipping")
-
-				continue
-			}
-
-			allTags = append(allTags, tag)
+			continue
 		}
+
+		allTags = append(allTags, entry.Tag)
 	}
 
 	// sort Tags

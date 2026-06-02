@@ -157,31 +157,35 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 		})
 
 		When("using invalid n param", func() {
-			DescribeTable("should return a UNSUPPORTED error", func(n string) {
+			DescribeTable("should ignore the param and return the full tag list", func(n string) {
+				// Mirrors Quay/MCR: malformed `n` values are silently ignored
+				// rather than rejected.
 				req := initRequest(string(image), "/tags/list", QueryParams{"n": n})
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-				checkErrorResponse(body, ocierrors.Unsupported)
+				checkListTagsOutput(body, string(image), tags)
 			},
 				// here we use string to allow non-integer values
 				Entry("negative n", "-1"),
-				Entry("vey big n", "1000000"),
+				Entry("very big n", "1000000"),
 				Entry("non integer n", "abc"),
 			)
 		})
 
 		When("using invalid last param", func() {
-			DescribeTable("should return a UNSUPPORTED error", func(last string) {
+			DescribeTable("should ignore the param and return the full tag list", func(last string) {
+				// Mirrors Quay/MCR: malformed or unknown `last` values are
+				// silently ignored rather than rejected.
 				req := initRequest(string(image), "/tags/list", QueryParams{"last": last})
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-				checkErrorResponse(body, ocierrors.Unsupported)
+				checkListTagsOutput(body, string(image), tags)
 			},
 				Entry("invalid tag", "==invalid"),
 				Entry("non-existing tag", "3.333"),
@@ -213,7 +217,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 		})
 
 		When("the image directory has bad permissions", func() {
-			It("should return a 500 error", func() {
+			It("should soft-fail and return 200 with an empty tag list", func() {
 				suite.FetchImage(re)
 
 				os.Chmod(re.ImagePath(suite.FsRoot), utils.PermissionNoRead)
@@ -222,14 +226,13 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-
-				Expect(body).To(BeEmpty(), string(body))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(string(body)).To(ContainSubstring(`"tags":null`))
 			})
 		})
 
 		When("the image directory is not readable", func() {
-			It("should return a 500 error", func() {
+			It("should soft-fail and still return the healthy tags", func() {
 				suite.FetchImage(re)
 
 				// copy the struct by dereferencing the pointer so we don't change the original
@@ -241,9 +244,8 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
-
-				Expect(body).To(BeEmpty(), string(body))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				Expect(string(body)).To(ContainSubstring(re.Tag))
 			})
 		})
 

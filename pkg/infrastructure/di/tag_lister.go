@@ -11,8 +11,7 @@ func (c *Container) getTagLister() *taglister.FileSystem {
 	if c.tagLister == nil {
 		l, err := taglister.NewFileSystem(
 			c.GetLogger(),
-			c.getImageFinder(),
-			c.config.FS.Root,
+			c.getTagWalker(),
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create tag lister",

@@ -14,12 +14,32 @@ const (
 
 	// match a tag name
 	// e.g. latest, v1.0.0, 1.0.0-beta, my_tag-123.
-	imageTagRegex = `^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*$`
+	imageTagRegex = `^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$`
+
+	// match a digest
+	// digests follow this specific grammar
+	// digest                ::= algorithm ":" encoded
+	// algorithm             ::= algorithm-component (algorithm-separator algorithm-component)*
+	// algorithm-component   ::= [a-z0-9]+
+	// algorithm-separator   ::= [+._-]
+	// encoded               ::= [a-zA-Z0-9=_-]+
+	// e.g. sha256:02c91f6b395a6b06d17b8985a2db90aef7b09feedff77eff1f7c269161263a9b
+	// e.g. multihash+base58:QmRZxt2b1FVZPNqd8hsiykDL3TdBDeTSPX9Kv46HmX4Gx8
+	// we do not need to check the validity of the hash value, only the grammar
+	// cf. https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
+	digestEncodedRegex            = `[a-zA-Z0-9=_-]+`
+	digestAlgorithmSeparatorRegex = `[+._-]`
+	digestAlgorithmComponentRegex = `[a-z0-9]+`
+	digestAlgorithmRegex          = digestAlgorithmComponentRegex +
+		`(` + digestAlgorithmSeparatorRegex + digestAlgorithmComponentRegex + `)*`
+	digestRegex = `^(?P<algorithm>` + digestAlgorithmRegex +
+		`):(?P<encoded>` + digestEncodedRegex + `)$`
 )
 
 var (
 	imageNameChecker = regexp.MustCompile(imageNameRegex)
 	imageTagChecker  = regexp.MustCompile(imageTagRegex)
+	digestChecker    = regexp.MustCompile(digestRegex)
 )
 
 type (
@@ -28,8 +48,15 @@ type (
 		Version  string
 	}
 
+	TagEntry struct {
+		SolutionVersion
+		Name ImageName
+		Tag  Tag
+	}
+
 	ImageName string
 	Tag       string
+	Digest    string
 
 	ListTagsInput struct {
 		Name ImageName
@@ -42,6 +69,18 @@ type (
 	ListTagsOutput struct {
 		Name ImageName `json:"name"`
 		Tags []Tag     `json:"tags"`
+	}
+
+	ManifestReference interface {
+		isManifestReference()
+		String() string
+		Validate() error
+	}
+
+	FetchManifestOutput struct {
+		MediaType     string
+		ContentDigest Digest
+		ManifestBytes []byte
 	}
 )
 
@@ -61,6 +100,32 @@ func (t Tag) Validate() error {
 	return nil
 }
 
+func (d Digest) Validate() error {
+	if !digestChecker.Match([]byte(d)) {
+		return ErrInvalidDigest
+	}
+
+	return nil
+}
+
+func (d Digest) Algorithm() (string, error) {
+	matches := digestChecker.FindStringSubmatch(string(d))
+	if matches == nil {
+		return "", ErrInvalidDigest
+	}
+
+	return matches[digestChecker.SubexpIndex("algorithm")], nil
+}
+
+func (d Digest) Encoded() (string, error) {
+	matches := digestChecker.FindStringSubmatch(string(d))
+	if matches == nil {
+		return "", ErrInvalidDigest
+	}
+
+	return matches[digestChecker.SubexpIndex("encoded")], nil
+}
+
 func (i ImageName) String() string {
 	return string(i)
 }
@@ -68,6 +133,14 @@ func (i ImageName) String() string {
 func (t Tag) String() string {
 	return string(t)
 }
+
+func (Tag) isManifestReference() {}
+
+func (d Digest) String() string {
+	return string(d)
+}
+
+func (Digest) isManifestReference() {}
 
 // from the OCI distribution spec:
 // ` If the list is not empty, the tags MUST be in lexical order

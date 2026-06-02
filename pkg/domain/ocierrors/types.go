@@ -22,10 +22,10 @@ const (
 	// BlobUploadUnknown    OCIErrorCode = "BLOB_UPLOAD_UNKNOWN"
 	// DigestInvalid        OCIErrorCode = "DIGEST_INVALID"
 	// ManifestBlobUnknown  OCIErrorCode = "MANIFEST_BLOB_UNKNOWN"
-	// ManifestInvalid      OCIErrorCode = "MANIFEST_INVALID"
-	// ManifestUnknown      OCIErrorCode = "MANIFEST_UNKNOWN".
-	NameInvalid OCIErrorCode = "NAME_INVALID"
-	NameUnknown OCIErrorCode = "NAME_UNKNOWN"
+	// ManifestInvalid      OCIErrorCode = "MANIFEST_INVALID".
+	ManifestUnknown OCIErrorCode = "MANIFEST_UNKNOWN"
+	NameInvalid     OCIErrorCode = "NAME_INVALID"
+	NameUnknown     OCIErrorCode = "NAME_UNKNOWN"
 	// SizeInvalid         OCIErrorCode = "SIZE_INVALID"
 	// Unauthorized        OCIErrorCode = "UNAUTHORIZED"
 	// Denied              OCIErrorCode = "DENIED".

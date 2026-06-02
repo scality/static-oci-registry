@@ -59,7 +59,7 @@ var _ = Describe("Find Images", Ordered, func() {
 
 	Context("Finding images in a corrupted FS", func() {
 		When("an image directory is not readable", func() {
-			It("should return a registry internal error", func() {
+			It("should skip the bad candidate and still return the healthy ones", func() {
 				suite.FetchImage(re)
 
 				// copy the struct by dereferencing the pointer so we don't change the original
@@ -67,11 +67,10 @@ var _ = Describe("Find Images", Ordered, func() {
 				rebad.Version = "v9.9.9"
 				os.MkdirAll(rebad.ImagePath(suite.FsRoot), utils.PermissionNone)
 
-				_, err := imageFinder.FindImage(context.Background(), re.Image)
+				found, err := imageFinder.FindImage(context.Background(), re.Image)
 
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).NotTo(BeEmpty())
 			})
 		})
 
