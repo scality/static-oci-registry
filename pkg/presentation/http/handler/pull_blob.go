@@ -42,6 +42,12 @@ func (*PullBlob) Matches(path string) bool {
 	return pullBlobURLRegex.MatchString(path)
 }
 
+// AllowedMethods reports the HTTP methods this endpoint accepts.
+// end-2 of the OCI distribution-spec accepts GET and HEAD.
+func (*PullBlob) AllowedMethods() []string {
+	return []string{http.MethodGet, http.MethodHead}
+}
+
 func (h *PullBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

@@ -29,3 +29,11 @@ func (c *Container) getPullBlobHandler() *handler.PullBlob {
 
 	return c.pullBlobHandler
 }
+
+func (c *Container) getUnsupportedHandler() *handler.UnsupportedEndpoint {
+	if c.unsupportedHandler == nil {
+		c.unsupportedHandler = handler.NewUnsupportedEndpoint()
+	}
+
+	return c.unsupportedHandler
+}

@@ -32,6 +32,7 @@ type Container struct {
 	listTagsHandler      *handler.ListTags
 	fetchManifestHandler *handler.FetchManifest
 	pullBlobHandler      *handler.PullBlob
+	unsupportedHandler   *handler.UnsupportedEndpoint
 
 	listTagsUseCase                *usecase.ListTags
 	fetchManifestFromTagUseCase    *usecase.FetchManifestFromTag

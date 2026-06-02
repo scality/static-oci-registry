@@ -37,6 +37,12 @@ func (*ListTags) Matches(path string) bool {
 	return listTagsURLRegex.MatchString(path)
 }
 
+// AllowedMethods reports the HTTP methods this endpoint accepts.
+// end-8 of the OCI distribution-spec is GET-only.
+func (*ListTags) AllowedMethods() []string {
+	return []string{http.MethodGet}
+}
+
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
