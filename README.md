@@ -10,10 +10,17 @@ for Pull and Discovery. Written in Go.
 | `GET`          | `/v2/`                             | `200`       | `404`/`401`       |         |
 | `GET`          | `/v2/<name>/tags/list`             | `200`       | `404`             | n, last |
 | `GET`, `HEAD`  | `/v2/<name>/manifests/<reference>` | `200`       | `404`             |         |
+| `GET`, `HEAD`  | `/v2/<name>/blobs/<digest>`        | `200`/`206` | `404`/`416`       |         |
 
 `<reference>` may be either a tag or a digest (e.g. `sha256:<hex>`). On success,
 responses include the `Docker-Content-Digest` and `Content-Type` headers; `HEAD`
 returns the same headers with an empty body.
+
+Blob responses stream the content from disk and support `Range` requests
+(`206 Partial Content`, `416 Requested Range Not Satisfiable`). A blob is only
+served if its `<digest>` is referenced by the manifest of at least one tag
+under `<name>` (as `config.digest`, a `layers[].digest`, or `subject.digest`);
+stray files in the tag directory are never exposed.
 
 ## Environment variables
 
