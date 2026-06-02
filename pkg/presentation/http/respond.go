@@ -19,18 +19,11 @@ func RespondWithJSON(
 	statusCode int,
 	l *slog.Logger,
 ) {
-	for key, value := range headers {
-		w.Header().Set(key, value)
-	}
-
 	if _, ok := headers["Content-Type"]; !ok {
 		w.Header().Set("Content-Type", "application/json")
 	}
 
-	// Content-Length is set automatically by net/http when Encode writes
-	// the body in one shot without chunked encoding, matching what real
-	// registries (Quay, MCR, GHCR) advertise on manifest responses.
-	w.WriteHeader(statusCode)
+	RespondNoBody(w, headers, statusCode, 0)
 
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		l.ErrorContext(ctx, "failed to encode response", slog.Any("error", err))
@@ -49,18 +42,11 @@ func RespondWithBytes(
 	statusCode int,
 	l *slog.Logger,
 ) {
-	for key, value := range headers {
-		w.Header().Set(key, value)
-	}
-
 	if _, ok := headers["Content-Type"]; !ok {
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
 
-	// Content-Length is set automatically by net/http when Write delivers
-	// the whole body in one call without chunked encoding, matching what
-	// real registries (Quay, MCR, GHCR) advertise on manifest responses.
-	w.WriteHeader(statusCode)
+	RespondNoBody(w, headers, statusCode, 0)
 
 	if _, err := w.Write(bytes); err != nil {
 		l.ErrorContext(ctx, "failed to write response", slog.Any("error", err))
@@ -84,10 +70,13 @@ func RespondNoBody(
 		w.Header().Set(key, value)
 	}
 
-	if _, ok := headers["Content-Type"]; !ok {
+	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
 
-	w.Header().Set("Content-Length", strconv.Itoa(bodyLen))
+	if bodyLen > 0 {
+		w.Header().Set("Content-Length", strconv.Itoa(bodyLen))
+	}
+
 	w.WriteHeader(statusCode)
 }

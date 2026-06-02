@@ -101,10 +101,7 @@ func (fs *FileSystem) WalkTags(
 				// make sure this directory contains a manifest.json file
 				tagEntry := domain.TagEntry{SolutionVersion: sv, Name: imageName, Tag: tag}
 				if info, err := os.Stat(fs.manifestPath(tagEntry)); err != nil || info.IsDir() {
-					l.WarnContext(ctx, "location/tag directory does not contain manifest file",
-						slog.String("location", dir),
-						slog.String("tag", entry.Name()),
-					)
+					tl.WarnContext(ctx, "location/tag directory does not contain manifest file")
 
 					continue
 				}

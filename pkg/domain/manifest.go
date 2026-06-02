@@ -4,6 +4,8 @@ import "github.com/scality/go-errors"
 
 const schemaVersion = 2
 
+// follows the OCI Image for Manifest
+// cf. https://github.com/opencontainers/image-spec/blob/main/manifest.md
 type (
 	ManifestDescriptor struct {
 		MediaType    string            `json:"mediaType"`

@@ -30,7 +30,7 @@ jobs:
         env:
           CERT_DIR: ${{ github.workspace }}/testcert
         run: |
-          mkdir certs &&make testcert && mv $CERT_DIR/* certs
+          mkdir certs && make testcert && mv $CERT_DIR/* certs
 
       - name: clean unneeded files
         run: |

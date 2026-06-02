@@ -151,7 +151,7 @@ func parseFetchManifestRequest(r *http.Request) (*FetchManifestInput, error) {
 			ocierrors.BuildOCIProperties(
 				ocierrors.ManifestUnknown,
 				domain.ErrInvalidReference.Error(),
-				map[string]string{"reference": matches[2]},
+				map[string]string{"image_name": matches[1], "reference": matches[2]},
 			),
 		)
 	}
