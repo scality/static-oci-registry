@@ -3,6 +3,29 @@
 A container registry implementation that respects [OCI spec](https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md)
 for Pull and Discovery. Written in Go.
 
+> [!NOTE]
+> This registry targets the **OCI distribution-spec v1.0.1** rather than
+> [v1.1](https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md).
+> Restricted to the Pull and Content Discovery workflows that this service
+> implements, v1.1 only adds two things on top of v1.0.1:
+>
+> 1. **`Link` header pagination on `GET /v2/<name>/tags/list`** (RFC 5988
+>    `rel="next"`). The `n` and `last` query parameters that drive
+>    pagination already exist in v1.0.1, and clients fall back to them when
+>    no `Link` header is returned, so omitting it is backward compatible.
+> 2. **The Referrers API** (`GET /v2/<name>/referrers/<digest>` and the
+>    referrers tag-schema fallback). This is used to discover artifacts
+>    (signatures, SBOMs, attestations, …) attached to an image via the
+>    `subject` field. The use cases served by this registry do not yet need to
+>    list referrers for the images it serves, so the endpoint is
+>    intentionally not implemented. Spec-compliant clients are expected to
+>    treat a missing referrers endpoint as "no referrers" and continue
+>    pulling normally.
+>
+> Push, chunked upload, cross-repo mount, deletion and the `OCI-Subject`
+> response header are also v1.1 additions, but they are push/management
+> concerns and are out of scope for this read-only registry.
+
 ## Endpoints
 
 | Method         | API Endpoint                       | Success     | Failure           | Params  |
