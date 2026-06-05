@@ -74,6 +74,7 @@ func (fs *FileSystem) PullBlob(
 					slog.String("solution", entry.Solution),
 					slog.String("version", entry.Version),
 					slog.String("tag", entry.Tag.String()),
+					slog.String("path", path),
 					slog.Any("error", err),
 				)
 			}
