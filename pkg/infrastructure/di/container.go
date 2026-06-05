@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/scality/static-oci-registry/cmd/config"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/blobpuller"
@@ -45,6 +46,8 @@ type Container struct {
 	tagManifestFetcher    *tagmanifestfetcher.FileSystem
 	digestManifestFetcher *digestmanifestfetcher.FileSystem
 	blobPuller            *blobpuller.FileSystem
+
+	fsRoot *os.Root
 }
 
 func NewContainer(ctx context.Context, cfg *config.Environment) *Container {

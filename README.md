@@ -45,6 +45,10 @@ served if its `<digest>` is referenced by the manifest of at least one tag
 under `<name>` (as `config.digest`, a `layers[].digest`, or `subject.digest`);
 stray files in the tag directory are never exposed.
 
+When pulling a blob, the `Docker-Content-Digest` response header echoes the digest from the request URL;
+the registry trusts the on-disk layout and does not re-hash blobs on the fly, which
+also avoids the cost of streaming every byte through a hash function on each pull.
+
 ## Environment variables
 
 This service can be configured through environment variables:

@@ -52,7 +52,7 @@ var _ = Describe("Walk Tags", Ordered, func() {
 
 		var err error
 
-		walker, err = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
+		walker, err = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, openRoot(suite.FsRoot))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -73,7 +73,7 @@ var _ = Describe("Walk Tags", Ordered, func() {
 
 		var err2 error
 
-		walker, err2 = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, suite.FsRoot)
+		walker, err2 = tagwalker.NewFileSystem(suite.Logger, mockImageFinder, openRoot(suite.FsRoot))
 		Expect(err2).NotTo(HaveOccurred())
 	})
 

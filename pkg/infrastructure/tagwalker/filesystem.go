@@ -2,6 +2,7 @@ package tagwalker
 
 import (
 	"context"
+	iofs "io/fs"
 	"iter"
 	"log/slog"
 	"os"
@@ -17,27 +18,18 @@ const manifestFileName = "manifest.json"
 type FileSystem struct {
 	logger      *slog.Logger
 	imageFinder service.ImageFinder
-	fsRoot      string
+	root      *os.Root
 }
 
 func NewFileSystem(
-	l *slog.Logger,
-	i service.ImageFinder,
-	r string,
+	logger *slog.Logger,
+	imageFinder service.ImageFinder,
+	root *os.Root,
 ) (*FileSystem, error) {
-	info, err := os.Stat(r)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.WithDetail("unable to access FS_ROOT"))
-	}
-
-	if !info.IsDir() {
-		return nil, errors.New("passed FS_ROOT is not a directory")
-	}
-
 	return &FileSystem{
-		logger:      l.With(slog.String("tag_walker", "filesystem")),
-		imageFinder: i,
-		fsRoot:      r,
+		logger:      logger.With(slog.String("tag_walker", "filesystem")),
+		imageFinder: imageFinder,
+		root:      root,
 	}, nil
 }
 
@@ -60,12 +52,9 @@ func (fs *FileSystem) WalkTags(
 		}
 
 		for _, sv := range candidates {
-			dir := fs.fsRoot +
-				"/" + sv.Solution +
-				"/" + sv.Version +
-				"/" + string(imageName)
+			dir := strings.Join([]string{sv.Solution, sv.Version, imageName.String()}, "/")
 
-			tagEntries, err := os.ReadDir(dir)
+			tagEntries, err := iofs.ReadDir(fs.root.FS(), dir)
 			if err != nil {
 				// Soft-fail: a single unreadable image dir shouldn't abort the
 				// whole walk. Log and skip; if no candidate yields a match the
@@ -100,7 +89,7 @@ func (fs *FileSystem) WalkTags(
 
 				// make sure this directory contains a manifest.json file
 				tagEntry := domain.TagEntry{SolutionVersion: sv, Name: imageName, Tag: tag}
-				if info, err := os.Stat(fs.manifestPath(tagEntry)); err != nil || info.IsDir() {
+				if info, err := fs.root.Stat(manifestPath(tagEntry)); err != nil || info.IsDir() {
 					tl.WarnContext(ctx, "location/tag directory does not contain manifest file")
 
 					continue
@@ -115,7 +104,7 @@ func (fs *FileSystem) WalkTags(
 }
 
 func (fs *FileSystem) ReadManifestBytes(entry domain.TagEntry) ([]byte, error) {
-	bytes, err := os.ReadFile(fs.manifestPath(entry))
+	bytes, err := fs.root.ReadFile(manifestPath(entry))
 	if err != nil {
 		return nil, errors.Wrap(err,
 			errors.WithDetail("failed to read manifest file in filesystem registry"))
@@ -124,9 +113,8 @@ func (fs *FileSystem) ReadManifestBytes(entry domain.TagEntry) ([]byte, error) {
 	return bytes, nil
 }
 
-func (fs *FileSystem) manifestPath(entry domain.TagEntry) string {
+func manifestPath(entry domain.TagEntry) string {
 	return strings.Join([]string{
-		fs.fsRoot, entry.Solution, entry.Version, entry.Name.String(),
-		entry.Tag.String(), manifestFileName,
+		entry.Solution, entry.Version, entry.Name.String(), entry.Tag.String(), manifestFileName,
 	}, "/")
 }

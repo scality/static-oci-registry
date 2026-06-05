@@ -46,6 +46,7 @@ func NewV2Router(logger *slog.Logger, routes ...Route) http.Handler {
 			}
 
 			if !slices.Contains(route.AllowedMethods(), r.Method) {
+				// this will return 404 instead of 405, which is intentional
 				HandleError(r.Context(), w, unsupportedMethodError(r.Method, route.AllowedMethods()), logger)
 
 				return

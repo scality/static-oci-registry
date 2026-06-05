@@ -104,7 +104,7 @@ var _ = Describe("Pull Blob", Ordered, func() {
 
 		var err error
 
-		puller, err = blobpuller.NewFileSystem(suite.Logger, mockWalker, suite.FsRoot)
+		puller, err = blobpuller.NewFileSystem(suite.Logger, mockWalker, openRoot(suite.FsRoot))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -129,36 +129,6 @@ var _ = Describe("Pull Blob", Ordered, func() {
 			Tag:             domain.Tag(tag),
 		}
 	}
-
-	Context("NewFileSystem", func() {
-		When("fsRoot does not exist", func() {
-			It("returns a wrapped error", func() {
-				missing := filepath.Join(suite.FsRoot, "does-not-exist")
-
-				_, err := blobpuller.NewFileSystem(suite.Logger, mockWalker, missing)
-				Expect(err).To(HaveOccurred())
-			})
-		})
-
-		When("fsRoot is a regular file", func() {
-			It("returns an error stating the path is not a directory", func() {
-				file := filepath.Join(suite.FsRoot, "not-a-dir")
-				Expect(os.WriteFile(file, []byte("x"), 0o600)).To(Succeed())
-
-				_, err := blobpuller.NewFileSystem(suite.Logger, mockWalker, file)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("not a directory"))
-			})
-		})
-
-		When("fsRoot is a valid directory", func() {
-			It("returns a usable puller", func() {
-				p, err := blobpuller.NewFileSystem(suite.Logger, mockWalker, suite.FsRoot)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(p).NotTo(BeNil())
-			})
-		})
-	})
 
 	Context("Happy paths", func() {
 		When("the requested digest matches the manifest config", func() {

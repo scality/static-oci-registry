@@ -19,27 +19,18 @@ import (
 type FileSystem struct {
 	logger    *slog.Logger
 	tagWalker service.TagWalker
-	fsRoot    string
+	root    *os.Root
 }
 
 func NewFileSystem(
-	l *slog.Logger,
-	t service.TagWalker,
-	r string,
+	logger *slog.Logger,
+	tagWalker service.TagWalker,
+	root *os.Root,
 ) (*FileSystem, error) {
-	info, err := os.Stat(r)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.WithDetail("unable to access FS_ROOT"))
-	}
-
-	if !info.IsDir() {
-		return nil, errors.New("passed FS_ROOT is not a directory")
-	}
-
 	return &FileSystem{
-		logger:    l.With(slog.String("blob_puller", "filesystem")),
-		tagWalker: t,
-		fsRoot:    r,
+		logger:    logger.With(slog.String("blob_puller", "filesystem")),
+		tagWalker: tagWalker,
+		root:    root,
 	}, nil
 }
 
@@ -64,11 +55,12 @@ func (fs *FileSystem) PullBlob(
 			)
 		}
 
-		path := fs.blobPath(entry, digest)
+		path := blobPath(entry, digest)
 
 		// Cheap existence check: if the file isn't here, skip the manifest
 		// parse entirely and move on to the next candidate tag.
-		if _, err := os.Stat(path); err != nil {
+		info, err := fs.root.Stat(path)
+		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				l.WarnContext(ctx, "failed to stat blob file, skipping tag",
 					slog.String("solution", entry.Solution),
@@ -78,6 +70,17 @@ func (fs *FileSystem) PullBlob(
 					slog.Any("error", err),
 				)
 			}
+
+			continue
+		}
+
+		if info.IsDir() {
+			l.WarnContext(ctx, "blob path is a directory, skipping tag",
+				slog.String("solution", entry.Solution),
+				slog.String("version", entry.Version),
+				slog.String("tag", entry.Tag.String()),
+				slog.String("path", path),
+			)
 
 			continue
 		}
@@ -102,7 +105,7 @@ func (fs *FileSystem) PullBlob(
 			continue
 		}
 
-		file, err := os.Open(path)
+		file, err := fs.root.Open(path)
 		if err != nil {
 			l.WarnContext(ctx, "failed to open blob file after stat, skipping tag",
 				slog.String("solution", entry.Solution),
@@ -133,7 +136,7 @@ func (fs *FileSystem) PullBlob(
 // blobPath returns the on-disk location of the blob with the given encoded
 // digest for the given tag entry. The layout mirrors tagwalker.manifestPath
 // so both helpers stay in sync.
-func (fs *FileSystem) blobPath(entry domain.TagEntry, digest domain.Digest) string {
+func blobPath(entry domain.TagEntry, digest domain.Digest) string {
 	encoded, err := digest.Encoded()
 	if err != nil {
 		// Unreachable: Encoded is a regex-capture wrapper that uses the same
@@ -144,8 +147,7 @@ func (fs *FileSystem) blobPath(entry domain.TagEntry, digest domain.Digest) stri
 	}
 
 	return strings.Join([]string{
-		fs.fsRoot, entry.Solution, entry.Version, entry.Name.String(),
-		entry.Tag.String(), encoded,
+		entry.Solution, entry.Version, entry.Name.String(), entry.Tag.String(), encoded,
 	}, "/")
 }
 
