@@ -46,7 +46,7 @@ jobs:
       - name: Run linters
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.11.4
+          version: v2.12.2
 
   test-unit:
     uses: ./.github/workflows/test-unit.yaml
