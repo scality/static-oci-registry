@@ -134,6 +134,20 @@ var _ = Describe("Pull Blob Integration", Ordered, func() {
 					checkBlobResponse(resp, body, wantLayerBytes, layerDigest)
 				})
 			})
+
+			When("fetching the config blob with ns query param (containerd-style)", func() {
+				It("returns the blob verbatim with correct headers", func() {
+					// containerd splits "docker.io/library/alpine" into
+					// ns=docker.io and image=library/alpine; the handler must rejoin them.
+					req := initRequest(
+						"library/alpine", "/blobs/"+string(configDigest), QueryParams{"ns": "docker.io"},
+					)
+
+					resp, body := execRequestRaw(client, req)
+
+					checkBlobResponse(resp, body, wantConfigBytes, configDigest)
+				})
+			})
 		})
 
 		Context("GET range requests (handled by http.ServeContent)", func() {

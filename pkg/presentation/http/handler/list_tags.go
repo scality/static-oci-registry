@@ -80,7 +80,7 @@ func parseListTagRequest(r *http.Request) (*domain.ListTagsInput, error) {
 		panic("list_tags: router/handler regex mismatch for path " + path)
 	}
 
-	img := domain.ImageName(matches[1])
+	img := domain.ImageName(parseNamespace(r) + matches[1])
 
 	err := img.Validate()
 	if err != nil {
