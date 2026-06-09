@@ -18,7 +18,7 @@ const manifestFileName = "manifest.json"
 type FileSystem struct {
 	logger      *slog.Logger
 	imageFinder service.ImageFinder
-	root      *os.Root
+	root        *os.Root
 }
 
 func NewFileSystem(
@@ -29,7 +29,7 @@ func NewFileSystem(
 	return &FileSystem{
 		logger:      logger.With(slog.String("tag_walker", "filesystem")),
 		imageFinder: imageFinder,
-		root:      root,
+		root:        root,
 	}, nil
 }
 

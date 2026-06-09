@@ -19,7 +19,7 @@ import (
 type FileSystem struct {
 	logger    *slog.Logger
 	tagWalker service.TagWalker
-	root    *os.Root
+	root      *os.Root
 }
 
 func NewFileSystem(
@@ -30,7 +30,7 @@ func NewFileSystem(
 	return &FileSystem{
 		logger:    logger.With(slog.String("blob_puller", "filesystem")),
 		tagWalker: tagWalker,
-		root:    root,
+		root:      root,
 	}, nil
 }
 
