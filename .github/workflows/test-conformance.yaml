@@ -80,7 +80,6 @@ jobs:
       # Run the conformance container directly to control --network host,
       # since the v1.0 action uses docker but doesn't expose that flag.
       - name: Run OCI Distribution Spec conformance test suite
-        continue-on-error: true # blob HEAD/GET specs fail until /v2/<name>/blobs/<digest> is implemented
         run: |
           mkdir -p ${{ github.workspace }}/artifacts/conformance-results
           docker run --rm --network host \

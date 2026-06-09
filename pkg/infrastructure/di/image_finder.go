@@ -11,7 +11,7 @@ func (c *Container) getImageFinder() *imagefinder.FileSystem {
 	if c.imageFinder == nil {
 		i, err := imagefinder.NewFileSystem(
 			c.GetLogger(),
-			c.config.FS.Root,
+			c.getFSRoot(),
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create image finder",

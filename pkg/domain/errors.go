@@ -14,6 +14,7 @@ var (
 	ErrInvalidManifest           = errors.New("invalid manifest")
 	ErrManifestNotFound          = errors.New("manifest not found in registry")
 	ErrInvalidReference          = errors.New("invalid or missing reference")
+	ErrBlobNotFound              = errors.New("blob not found in registry")
 	ErrRegistryInternal          = errors.New("there was an internal error in the registry")
 	ErrInvalidParameter          = errors.New("invalid parameter")
 	ErrParameterOutOfRange       = errors.New("parameter out of range")
