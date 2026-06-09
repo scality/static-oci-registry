@@ -28,16 +28,23 @@ for Pull and Discovery. Written in Go.
 
 ## Endpoints
 
-| Method         | API Endpoint                       | Success     | Failure           | Params  |
-| -------------- | ---------------------------------- | ----------- | ----------------- | ------- |
-| `GET`          | `/v2/`                             | `200`       | `404`/`401`       |         |
-| `GET`          | `/v2/<name>/tags/list`             | `200`       | `404`             | n, last |
-| `GET`, `HEAD`  | `/v2/<name>/manifests/<reference>` | `200`       | `404`             |         |
-| `GET`, `HEAD`  | `/v2/<name>/blobs/<digest>`        | `200`/`206` | `404`/`416`       |         |
+| Method         | API Endpoint                       | Success     | Failure           | Params      |
+| -------------- | ---------------------------------- | ----------- | ----------------- | ----------- |
+| `GET`          | `/v2/`                             | `200`       | `404`/`401`       |             |
+| `GET`          | `/v2/<name>/tags/list`             | `200`       | `404`             | n, last, ns |
+| `GET`, `HEAD`  | `/v2/<name>/manifests/<reference>` | `200`       | `404`             | ns          |
+| `GET`, `HEAD`  | `/v2/<name>/blobs/<digest>`        | `200`/`206` | `404`/`416`       | ns          |
 
 `<reference>` may be either a tag or a digest (e.g. `sha256:<hex>`). On success,
 responses include the `Docker-Content-Digest` and `Content-Type` headers; `HEAD`
 returns the same headers with an empty body.
+
+The `ns` query parameter is accepted on all repository-scoped endpoints for
+compatibility with clients such as **containerd**, which split a pull reference
+like `docker.io/library/alpine` into a namespace (`ns=docker.io`) and a repository
+path (`library/alpine`). When present, `ns` is prepended to `<name>`
+before the image is resolved against the on-disk hierarchy; requests
+without `ns` are unaffected.
 
 Blob responses stream the content from disk and support `Range` requests
 (`206 Partial Content`, `416 Requested Range Not Satisfiable`). A blob is only

@@ -17,7 +17,7 @@ import (
 
 type FileSystem struct {
 	logger *slog.Logger
-	root *os.Root
+	root   *os.Root
 }
 
 func NewFileSystem(
@@ -27,7 +27,7 @@ func NewFileSystem(
 	// make sure r exists
 	return &FileSystem{
 		logger: logger.With(slog.String("image_finder", "filesystem")),
-		root: root,
+		root:   root,
 	}, nil
 }
 

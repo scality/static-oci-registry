@@ -121,7 +121,7 @@ func parseFetchManifestRequest(r *http.Request) (*FetchManifestInput, error) {
 		panic("fetch_manifest: router/handler regex mismatch for path " + path)
 	}
 
-	img := domain.ImageName(matches[1])
+	img := domain.ImageName(parseNamespace(r) + matches[1])
 	if err := img.Validate(); err != nil {
 		return nil, errors.Wrap(
 			err,

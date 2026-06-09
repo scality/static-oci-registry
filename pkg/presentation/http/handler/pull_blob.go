@@ -97,7 +97,7 @@ func parsePullBlobRequest(r *http.Request) (*PullBlobInput, error) {
 		panic("pull_blob: router/handler regex mismatch for path " + path)
 	}
 
-	image := domain.ImageName(matches[1])
+	image := domain.ImageName(parseNamespace(r) + matches[1])
 	if err := image.Validate(); err != nil {
 		return nil, errors.Wrap(
 			err,
