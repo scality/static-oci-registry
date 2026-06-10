@@ -25,7 +25,7 @@ jobs:
             ${{ github.workspace }}/artifacts/unit-results/report.html
       - name: Upload test results
         if: always()
-        uses: scality/action-artifacts@v4
+        uses: scality/action-artifacts@4d348ec54efb29b5fc6226e433a1e0302242594f # v4
         with:
           method: upload
           url: https://artifacts.scality.net
