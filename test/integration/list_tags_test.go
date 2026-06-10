@@ -86,6 +86,32 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 			})
 		})
 
+		When("using ns query param (containerd-style)", func() {
+			It("should prepend ns to the image name and return the tags", func() {
+				// containerd splits "docker.io/library/alpine" into ns=docker.io
+				// and image=library/alpine; the handler must rejoin them.
+				req := initRequest("library/alpine", "/tags/list", QueryParams{"ns": "docker.io"})
+
+				resp, body := execRequest(client, req)
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				checkListTagsOutput(body, string(image), tags)
+			})
+
+			It("should reject a path-traversal ns with NAME_INVALID", func() {
+				// ns is unsanitized user input prepended verbatim to the image name.
+				// Path traversal must be blocked by the OCI image-name grammar
+				// (which rejects "..") rather than by the handler itself.
+				req := initRequest("library/alpine", "/tags/list", QueryParams{"ns": "../../etc"})
+
+				resp, body := execRequest(client, req)
+
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				checkErrorResponse(body, ocierrors.NameInvalid)
+			})
+		})
+
 		When("using valid n param", func() {
 			DescribeTable("should return the correct number of tags", func(n int) {
 				req := initRequest(string(image), "/tags/list", QueryParams{"n": strconv.Itoa(n)})

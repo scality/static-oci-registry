@@ -22,6 +22,12 @@ func (*FetchManifest) Matches(path string) bool {
 	return fetchManifestURLRegex.MatchString(path)
 }
 
+// AllowedMethods reports the HTTP methods this endpoint accepts.
+// end-2/end-3 of the OCI distribution-spec accept GET and HEAD.
+func (*FetchManifest) AllowedMethods() []string {
+	return []string{http.MethodGet, http.MethodHead}
+}
+
 type FetchManifestInput struct {
 	Name domain.ImageName
 	Ref  domain.ManifestReference
@@ -115,7 +121,7 @@ func parseFetchManifestRequest(r *http.Request) (*FetchManifestInput, error) {
 		panic("fetch_manifest: router/handler regex mismatch for path " + path)
 	}
 
-	img := domain.ImageName(matches[1])
+	img := domain.ImageName(parseNamespace(r) + matches[1])
 	if err := img.Validate(); err != nil {
 		return nil, errors.Wrap(
 			err,

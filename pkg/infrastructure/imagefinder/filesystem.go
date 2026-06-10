@@ -3,6 +3,7 @@ package imagefinder
 
 import (
 	"context"
+	iofs "io/fs"
 	"log/slog"
 	"os"
 	"sort"
@@ -16,27 +17,17 @@ import (
 
 type FileSystem struct {
 	logger *slog.Logger
-	fsRoot string
+	root   *os.Root
 }
 
 func NewFileSystem(
-	l *slog.Logger,
-	r string,
+	logger *slog.Logger,
+	root *os.Root,
 ) (*FileSystem, error) {
 	// make sure r exists
-	info, err := os.Stat(r)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.WithDetail("unable to access FS_ROOT"))
-	}
-
-	// make sure r is a directory
-	if !info.IsDir() {
-		return nil, errors.New("passed FS_ROOT is not a directory")
-	}
-
 	return &FileSystem{
-		logger: l.With(slog.String("image_finder", "filesystem")),
-		fsRoot: r,
+		logger: logger.With(slog.String("image_finder", "filesystem")),
+		root:   root,
 	}, nil
 }
 
@@ -50,7 +41,7 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 	// walks the fsroot by solution and version and gathers a list of `solution/version` dirs
 	// such that `solution/version/imageName` exists, is a dir, and is not empty
 	// return an error if no such directory exists
-	solutions, err := os.ReadDir(fs.fsRoot)
+	solutions, err := iofs.ReadDir(fs.root.FS(), ".")
 	if err != nil {
 		return nil, errors.Wrap(
 			domain.ErrRegistryInternal,
@@ -70,7 +61,7 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 			continue
 		}
 
-		versionCandidates, err := os.ReadDir(fs.fsRoot + "/" + solution.Name())
+		versionCandidates, err := iofs.ReadDir(fs.root.FS(), solution.Name())
 		if err != nil {
 			return nil, errors.Wrap(
 				domain.ErrRegistryInternal,
@@ -121,9 +112,8 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 		versions = append(versions, unsortedVersions...)
 
 		for _, candidate := range versions {
-			info, err := os.Stat(
-				fs.fsRoot +
-					"/" + solution.Name() +
+			info, err := fs.root.Stat(
+				solution.Name() +
 					"/" + candidate.Name() +
 					"/" + string(imageName),
 			)

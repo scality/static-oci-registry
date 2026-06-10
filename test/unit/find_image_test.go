@@ -28,7 +28,7 @@ var _ = Describe("Find Images", Ordered, func() {
 
 		var err error
 
-		imageFinder, err = imagefinder.NewFileSystem(suite.Logger, suite.FsRoot)
+		imageFinder, err = imagefinder.NewFileSystem(suite.Logger, openRoot(suite.FsRoot))
 		Expect(err).NotTo(HaveOccurred())
 	})
 

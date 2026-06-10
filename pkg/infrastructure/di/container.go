@@ -5,8 +5,10 @@ import (
 	"crypto/tls"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/scality/static-oci-registry/cmd/config"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/blobpuller"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/digestmanifestfetcher"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
@@ -30,16 +32,22 @@ type Container struct {
 
 	listTagsHandler      *handler.ListTags
 	fetchManifestHandler *handler.FetchManifest
+	pullBlobHandler      *handler.PullBlob
+	unsupportedHandler   *handler.UnsupportedEndpoint
 
 	listTagsUseCase                *usecase.ListTags
 	fetchManifestFromTagUseCase    *usecase.FetchManifestFromTag
 	fetchManifestFromDigestUseCase *usecase.FetchManifestFromDigest
+	pullBlobUseCase                *usecase.PullBlob
 
 	imageFinder           *imagefinder.FileSystem
 	tagLister             *taglister.FileSystem
 	tagWalker             *tagwalker.FileSystem
 	tagManifestFetcher    *tagmanifestfetcher.FileSystem
 	digestManifestFetcher *digestmanifestfetcher.FileSystem
+	blobPuller            *blobpuller.FileSystem
+
+	fsRoot *os.Root
 }
 
 func NewContainer(ctx context.Context, cfg *config.Environment) *Container {

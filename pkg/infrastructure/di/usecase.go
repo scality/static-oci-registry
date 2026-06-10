@@ -34,3 +34,14 @@ func (c *Container) getFetchManifestFromDigestUseCase() *usecase.FetchManifestFr
 
 	return c.fetchManifestFromDigestUseCase
 }
+
+func (c *Container) getPullBlobUseCase() *usecase.PullBlob {
+	if c.pullBlobUseCase == nil {
+		c.pullBlobUseCase = usecase.NewPullBlob(
+			c.GetLogger(),
+			c.getBlobPuller(),
+		)
+	}
+
+	return c.pullBlobUseCase
+}

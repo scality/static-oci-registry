@@ -121,6 +121,17 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 					checkManifestResponse(resp, body, wantBytes, mediaType, wantDigest)
 				})
 			})
+			When("fetching by tag with ns query param (containerd-style)", func() {
+				It("returns the manifest verbatim with correct headers", func() {
+					// containerd splits "docker.io/library/alpine" into
+					// ns=docker.io and image=library/alpine; the handler must rejoin them.
+					req := initRequest("library/alpine", "/manifests/"+tag, QueryParams{"ns": "docker.io"})
+
+					resp, body := execRequestRaw(client, req)
+
+					checkManifestResponse(resp, body, wantBytes, mediaType, wantDigest)
+				})
+			})
 		})
 
 		Context("GET 404 error envelopes", func() {
