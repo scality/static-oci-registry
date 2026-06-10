@@ -17,10 +17,10 @@ type OCIError struct {
 }
 
 const (
-	// BlobUnknown          OCIErrorCode = "BLOB_UNKNOWN"
+	BlobUnknown OCIErrorCode = "BLOB_UNKNOWN"
 	// BlobUploadInvalid    OCIErrorCode = "BLOB_UPLOAD_INVALID"
-	// BlobUploadUnknown    OCIErrorCode = "BLOB_UPLOAD_UNKNOWN"
-	// DigestInvalid        OCIErrorCode = "DIGEST_INVALID"
+	// BlobUploadUnknown    OCIErrorCode = "BLOB_UPLOAD_UNKNOWN".
+	DigestInvalid OCIErrorCode = "DIGEST_INVALID"
 	// ManifestBlobUnknown  OCIErrorCode = "MANIFEST_BLOB_UNKNOWN"
 	// ManifestInvalid      OCIErrorCode = "MANIFEST_INVALID".
 	ManifestUnknown OCIErrorCode = "MANIFEST_UNKNOWN"
@@ -69,19 +69,19 @@ func BuildOCIProperties(code OCIErrorCode, msg string, details map[string]string
 
 func extractCodeAndMessage(
 	k string, v any, code OCIErrorCode, message string,
-) (OCIErrorCode, string) {
+) (OCIErrorCode, string, bool) {
 	switch k {
 	case OCICode:
 		if val, ok := v.(OCIErrorCode); ok {
-			return val, message
+			return val, message, true
 		}
 	case OCIMessage:
 		if val, ok := v.(string); ok {
-			return code, val
+			return code, val, true
 		}
 	}
 
-	return code, message
+	return code, message, false
 }
 
 func extractOCIProps(props map[string]any) (OCIErrorCode, string, map[string]string) {
@@ -91,11 +91,12 @@ func extractOCIProps(props map[string]any) (OCIErrorCode, string, map[string]str
 	details := make(map[string]string)
 
 	for k, v := range props {
-		code, message = extractCodeAndMessage(k, v, code, message)
-
-		if key, found := strings.CutPrefix(k, OCIPrefix); found {
-			if val, ok := v.(string); ok {
-				details[key] = val
+		var changed bool
+		if code, message, changed = extractCodeAndMessage(k, v, code, message); !changed {
+			if key, found := strings.CutPrefix(k, OCIPrefix); found {
+				if val, ok := v.(string); ok {
+					details[key] = val
+				}
 			}
 		}
 	}

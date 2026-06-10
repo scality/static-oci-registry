@@ -19,8 +19,14 @@ func (c *Container) getHTTPRouter() http.Handler {
 
 		// OCI endpoints under /v2/
 		httpRouter.Handle("/v2/", apphttp.NewV2Router(
+			c.GetLogger(),
+			// UnsupportedEndpoint is registered first so any future blob
+			// route additions cannot accidentally shadow the /blobs/uploads/
+			// rejection path.
+			c.getUnsupportedHandler(),
 			c.getListTagsHandler(),
 			c.getFetchManifestHandler(),
+			c.getPullBlobHandler(),
 		))
 
 		c.router = httpRouter

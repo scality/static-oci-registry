@@ -12,7 +12,7 @@ func (c *Container) getTagWalker() *tagwalker.FileSystem {
 		l, err := tagwalker.NewFileSystem(
 			c.GetLogger(),
 			c.getImageFinder(),
-			c.config.FS.Root,
+			c.getFSRoot(),
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create tag walker",

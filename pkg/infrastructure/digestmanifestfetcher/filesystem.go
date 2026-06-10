@@ -32,12 +32,12 @@ type FileSystem struct {
 }
 
 func NewFileSystem(
-	l *slog.Logger,
-	t service.TagWalker,
+	logger *slog.Logger,
+	tagWalker service.TagWalker,
 ) (*FileSystem, error) {
 	return &FileSystem{
-		logger:    l.With(slog.String("digest_manifest_fetcher", "filesystem")),
-		tagWalker: t,
+		logger:    logger.With(slog.String("digest_manifest_fetcher", "filesystem")),
+		tagWalker: tagWalker,
 	}, nil
 }
 
