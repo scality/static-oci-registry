@@ -129,6 +129,7 @@ func parseFetchManifestRequest(r *http.Request) (*FetchManifestInput, error) {
 			ocierrors.BuildOCIProperties(
 				ocierrors.NameInvalid,
 				err.Error(),
+				// nolint: goconst
 				map[string]string{"image_name": string(img)},
 			),
 		)
@@ -157,6 +158,7 @@ func parseFetchManifestRequest(r *http.Request) (*FetchManifestInput, error) {
 			ocierrors.BuildOCIProperties(
 				ocierrors.ManifestUnknown,
 				domain.ErrInvalidReference.Error(),
+				// nolint: goconst
 				map[string]string{"image_name": matches[1], "reference": matches[2]},
 			),
 		)

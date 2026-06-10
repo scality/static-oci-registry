@@ -105,7 +105,8 @@ func parsePullBlobRequest(r *http.Request) (*PullBlobInput, error) {
 			ocierrors.BuildOCIProperties(
 				ocierrors.NameInvalid,
 				err.Error(),
-				map[string]string{"name": image.String()},
+				// nolint: goconst
+				map[string]string{"image_name": image.String()},
 			),
 		)
 	}
