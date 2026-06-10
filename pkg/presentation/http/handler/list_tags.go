@@ -37,6 +37,12 @@ func (*ListTags) Matches(path string) bool {
 	return listTagsURLRegex.MatchString(path)
 }
 
+// AllowedMethods reports the HTTP methods this endpoint accepts.
+// end-8 of the OCI distribution-spec is GET-only.
+func (*ListTags) AllowedMethods() []string {
+	return []string{http.MethodGet}
+}
+
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -74,7 +80,7 @@ func parseListTagRequest(r *http.Request) (*domain.ListTagsInput, error) {
 		panic("list_tags: router/handler regex mismatch for path " + path)
 	}
 
-	img := domain.ImageName(matches[1])
+	img := domain.ImageName(parseNamespace(r) + matches[1])
 
 	err := img.Validate()
 	if err != nil {

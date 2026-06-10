@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"os"
 	"testing"
 
 	// nolint: revive,staticcheck // only gomega and ginkgo are to be used as dot imports
@@ -10,6 +11,13 @@ import (
 )
 
 var suite *utils.TestSuite
+
+func openRoot(path string) *os.Root {
+	r, err := os.OpenRoot(path)
+	Expect(err).NotTo(HaveOccurred())
+
+	return r
+}
 
 func TestUnit(t *testing.T) {
 	RegisterFailHandler(Fail)
