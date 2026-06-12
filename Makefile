@@ -77,3 +77,7 @@ unit-test:
 .PHONY: integration-test
 integration-test:
 	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-integration.xml test/integration
+
+.PHONY: e2e-test
+e2e-test:
+	ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-e2e.xml test/e2e
