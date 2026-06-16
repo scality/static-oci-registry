@@ -32,9 +32,9 @@ sudo tee "${certs_d}/hosts.toml" >/dev/null <<EOF
 EOF
 
 sudo tee /etc/containerd/config.toml >/dev/null <<'EOF'
-version = 2
+version = 3
 
-[plugins."io.containerd.grpc.v1.cri".registry]
+[plugins."io.containerd.cri.v1.images".registry]
   config_path = "/etc/containerd/certs.d"
 
 [grpc]
