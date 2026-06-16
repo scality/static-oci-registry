@@ -24,9 +24,8 @@ func TestE2E(t *testing.T) {
 	RunSpecs(t, "E2E Suite")
 }
 
-// this test assumes that the registry is already running
+// this test assumes that the registry is already running.
 var _ = BeforeSuite(func() {
-
 	registryHost := os.Getenv("TEST_REGISTRY_HOST")
 	if registryHost == "" {
 		registryHost = "localhost"
@@ -53,9 +52,11 @@ var _ = BeforeSuite(func() {
 			return err
 		}
 		defer resp.Body.Close()
+
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("status %d", resp.StatusCode)
 		}
+
 		return nil
 	}, timeoutDurationInSeconds*time.Second, time.Second).Should(Succeed())
 })

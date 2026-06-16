@@ -41,7 +41,9 @@ var _ = Describe("Containerd", Ordered, func() {
 
 		resp, err := client.Head("https://" + registryEndpoint + "/v2/" + testImage + "/manifests/" + testTags[0])
 		Expect(err).NotTo(HaveOccurred(), "failed to check if the image exists in the registry %s", err)
+
 		defer resp.Body.Close()
+
 		Expect(resp.StatusCode).To(Equal(200), "failed to check if the image exists in the registry, status code: %d", resp.StatusCode)
 
 		registryDigest = resp.Header.Get("Docker-Content-Digest")
@@ -86,13 +88,17 @@ var _ = Describe("Containerd", Ordered, func() {
 	Context("Pulling an image idempotently", Ordered, func() {
 		It("should pull the image successfully on containerd", func() {
 			crictlPull(imageRef + ":" + testTags[0])
+
 			_ = exec.Command("crictl", "rmi", "--prune").Run()
+
 			crictlPull(imageRef + ":" + testTags[0])
 		})
 
 		It("should pull the image successfully on podman", func() {
 			podmanPull(imageRef + ":" + testTags[0])
+
 			_ = exec.Command("podman", "rmi", "-a", "-f").Run()
+
 			podmanPull(imageRef + ":" + testTags[0])
 		})
 	})
@@ -100,6 +106,7 @@ var _ = Describe("Containerd", Ordered, func() {
 
 func podmanPull(ref string) {
 	GinkgoHelper()
+
 	podmanArgs := []string{
 		"pull",
 		ref,
@@ -119,6 +126,7 @@ func podmanPull(ref string) {
 
 func crictlPull(ref string) {
 	GinkgoHelper()
+
 	crictlArgs := []string{
 		"pull",
 		ref,
