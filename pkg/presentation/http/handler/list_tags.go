@@ -91,6 +91,7 @@ func parseListTagRequest(r *http.Request) (*domain.ListTagsInput, error) {
 			ocierrors.BuildOCIProperties(
 				ocierrors.NameInvalid,
 				err.Error(),
+				// nolint: goconst
 				map[string]string{"image_name": string(img)},
 			),
 		)

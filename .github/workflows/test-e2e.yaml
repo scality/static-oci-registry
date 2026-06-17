@@ -1,0 +1,95 @@
+name: E2E Tests
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        required: true
+        type: string
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: clone the repo
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: set up go
+        uses: ./.github/actions/setup-go
+
+      # run make testfs to replicate a testfs
+      - name: make test filesystem
+        env:
+          TEST_DIR: ${{ github.workspace }}/_testfs
+        run: |
+          mkdir fs && make testfs && mv $TEST_DIR/* fs
+
+      # run make testcert to replicate proper certs
+      - name: Generate TLS certificates
+        env:
+          CERT_DIR: ${{ github.workspace }}/testcert
+        run: |
+          mkdir certs && make testcert && mv $CERT_DIR/* certs
+
+      - name: setup podman
+        env:
+          CA_CERT: ${{ github.workspace }}/certs/ca.crt
+        run: .github/scripts/setup-podman.sh
+
+      - name: setup containerd
+        env:
+          CA_CERT: ${{ github.workspace }}/certs/ca.crt
+        run: .github/scripts/setup-containerd.sh
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start registry
+        run: |
+          docker run -d --name registry \
+            --mount type=bind,source=${{ github.workspace }},target=/data \
+            -e FS_ROOT=/data/fs \
+            -e HTTP_TLS_CERT_FILE_PATH=/data/certs/server.crt \
+            -e HTTP_TLS_KEY_FILE_PATH=/data/certs/server.key \
+            -p 5000:5000 \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+
+      # Wait for registry to be up
+      - name: Wait for the registry to be up
+        run: |
+          for i in {1..10}; do
+            if curl -sf --cacert ${{ github.workspace }}/certs/ca.crt https://localhost:5000/v2/; then
+              echo "Registry is up!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Registry did not start in time." >&2
+          exit 1
+
+      - name: Run the tests
+        run: |
+          mkdir -p ${{ github.workspace }}/artifacts/e2e-results
+          make e2e-test JUNIT_REPORT_DIR=${{ github.workspace }}/artifacts/e2e-results
+
+      - name: Generate HTML report
+        if: always()
+        run: |
+          python3 -m pip install junit2html --quiet
+          junit2html \
+            ${{ github.workspace }}/artifacts/e2e-results/junit-e2e.xml \
+            ${{ github.workspace }}/artifacts/e2e-results/report.html
+
+      - name: Upload test results
+        if: always()
+        uses: scality/action-artifacts@4d348ec54efb29b5fc6226e433a1e0302242594f # v4
+        with:
+          method: upload
+          url: https://artifacts.scality.net
+          user: ${{ secrets.ARTIFACTS_USER }}
+          password: ${{ secrets.ARTIFACTS_PASSWORD }}
+          source: ${{ github.workspace }}/artifacts/

@@ -107,3 +107,59 @@ var _ = Describe("Find Images", Ordered, func() {
 		os.Chmod(suite.FsRoot, utils.PermissionOK)
 	})
 })
+
+var _ = Describe("Find Images ordering (round-robin, newest version first)", Ordered, func() {
+	// Layout under suite.FsRoot:
+	//   rr-sol-a/{v1.0.0,v2.0.0,v3.0.0}/<image>/
+	//   rr-sol-b/v1.0.0/<image>/
+	//   rr-sol-c/{v1.0.0,v2.0.0}/<image>/
+	//
+	// Expected ordering returned by FindImage:
+	//   (a:v3.0.0) (b:v1.0.0) (c:v2.0.0)  -- highest of each solution, round-robin
+	//   (a:v2.0.0)             (c:v1.0.0) -- then next-highest
+	//   (a:v1.0.0)                        -- then last
+	const image domain.ImageName = "docker.io/round-robin/test-image"
+
+	layout := map[string][]string{
+		"rr-sol-a": {"v1.0.0", "v2.0.0", "v3.0.0"},
+		"rr-sol-b": {"v1.0.0"},
+		"rr-sol-c": {"v1.0.0", "v2.0.0"},
+	}
+
+	var imageFinder *imagefinder.FileSystem
+
+	BeforeAll(func() {
+		for solution, versions := range layout {
+			for _, version := range versions {
+				path := suite.FsRoot + "/" + solution + "/" + version + "/" + string(image)
+				Expect(os.MkdirAll(path, utils.PermissionOK)).To(Succeed())
+			}
+		}
+
+		var err error
+
+		imageFinder, err = imagefinder.NewFileSystem(suite.Logger, openRoot(suite.FsRoot))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterAll(func() {
+		for solution := range layout {
+			Expect(os.RemoveAll(suite.FsRoot + "/" + solution)).To(Succeed())
+		}
+	})
+
+	It("interleaves solutions and emits the newest version of each first", func() {
+		found, err := imageFinder.FindImage(context.Background(), image)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Exact ordering: highest version of each solution, then next-highest, etc.
+		Expect(found).To(Equal([]domain.SolutionVersion{
+			{Solution: "rr-sol-a", Version: "v3.0.0"},
+			{Solution: "rr-sol-b", Version: "v1.0.0"},
+			{Solution: "rr-sol-c", Version: "v2.0.0"},
+			{Solution: "rr-sol-a", Version: "v2.0.0"},
+			{Solution: "rr-sol-c", Version: "v1.0.0"},
+			{Solution: "rr-sol-a", Version: "v1.0.0"},
+		}))
+	})
+})

@@ -50,7 +50,7 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 		)
 	}
 
-	found := make([]domain.SolutionVersion, 0)
+	found := make(map[string][]domain.SolutionVersion, 0)
 
 	for _, solution := range solutions {
 		if !solution.IsDir() {
@@ -60,6 +60,8 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 
 			continue
 		}
+
+		found[solution.Name()] = make([]domain.SolutionVersion, 0)
 
 		versionCandidates, err := iofs.ReadDir(fs.root.FS(), solution.Name())
 		if err != nil {
@@ -105,7 +107,7 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 			vi := version.Must(version.NewVersion(versions[i].Name()))
 			vj := version.Must(version.NewVersion(versions[j].Name()))
 
-			return vi.LessThan(vj)
+			return vj.LessThan(vi)
 		})
 
 		// we include invalid semvers either way as a fallback
@@ -141,14 +143,33 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 				continue
 			}
 
-			found = append(found, domain.SolutionVersion{
+			found[solution.Name()] = append(found[solution.Name()], domain.SolutionVersion{
 				Solution: solution.Name(),
 				Version:  candidate.Name(),
 			})
 		}
 	}
 
-	if len(found) == 0 {
+	sorted := make([]domain.SolutionVersion, 0)
+
+	finished := false
+	index := 0
+
+	for !finished {
+		finished = true
+
+		for _, solution := range solutions {
+			if versions, ok := found[solution.Name()]; ok && index < len(versions) {
+				finished = false
+
+				sorted = append(sorted, versions[index])
+			}
+		}
+
+		index++
+	}
+
+	if len(sorted) == 0 {
 		return nil, errors.Wrap(
 			domain.ErrImageNotFound,
 			errors.WithDetail("image not found in filesystem registry"),
@@ -160,5 +181,5 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 		)
 	}
 
-	return found, nil
+	return sorted, nil
 }
