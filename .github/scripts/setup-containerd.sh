@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Configures the system containerd to:
 #   - run the CRI plugin (disabled by default in the docker-shipped containerd
-#     on ubuntu-latest),
+#     on ubuntu-24.04),
 #   - trust the registry's CA via /etc/containerd/certs.d,
 # then installs crictl and writes /etc/crictl.yaml so plain `crictl ...`
 # invocations (no env vars, no flags) work for any user.
