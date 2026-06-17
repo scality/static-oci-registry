@@ -1,0 +1,16 @@
+name: "Post Merge"
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build Docker Image
+    uses: ./.github/workflows/build.yaml
+    secrets: inherit
+    with:
+      is-development: false
+      is-latest: true
+      is-stable: false
