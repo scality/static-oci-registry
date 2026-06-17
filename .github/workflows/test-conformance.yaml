@@ -103,7 +103,7 @@ jobs:
 
       - name: Upload conformance results
         if: always()
-        uses: scality/action-artifacts@4d348ec54efb29b5fc6226e433a1e0302242594f # v4
+        uses: scality/action-artifacts@914687fd3a3598e7ef7dfaac249a988c5f4b5c94 # v4
         with:
           method: upload
           url: https://artifacts.scality.net
