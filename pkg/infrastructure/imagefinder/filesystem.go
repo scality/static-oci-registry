@@ -192,18 +192,33 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 	return sorted, nil
 }
 
-// isLayout reports whether base is an OCI Image Layout (has oci-layout and
-// index.json). Stray directories that are not layouts are skipped.
+// isLayout reports whether base is an OCI Image Layout (has both oci-layout
+// and index.json as files). A directory with neither marker is simply not an
+// image and is skipped quietly; a directory with only one marker is a
+// malformed layout and is flagged.
 func (fs *FileSystem) isLayout(ctx context.Context, l *slog.Logger, base string) bool {
-	for _, marker := range []string{"oci-layout", "index.json"} {
-		info, err := fs.root.Stat(base + "/" + marker)
-		if err != nil || info.IsDir() {
-			l.WarnContext(ctx, "image directory is not an OCI layout, skipping",
-				slog.String("path", base), slog.String("missing", marker))
+	markers := []string{"oci-layout", "index.json"}
 
-			return false
+	present := 0
+
+	for _, marker := range markers {
+		if info, err := fs.root.Stat(base + "/" + marker); err == nil && !info.IsDir() {
+			present++
 		}
 	}
 
-	return true
+	switch present {
+	case len(markers):
+		return true
+	case 0:
+		l.DebugContext(ctx, "directory is not an OCI layout, skipping",
+			slog.String("path", base))
+
+		return false
+	default:
+		l.WarnContext(ctx, "directory looks like a malformed OCI layout, skipping",
+			slog.String("path", base))
+
+		return false
+	}
 }

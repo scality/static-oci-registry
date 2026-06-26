@@ -13,7 +13,7 @@ type Index struct {
 }
 
 func (i Index) Validate() error {
-	if i.SchemaVersion != schemaVersion || !IsImageIndexMediaType(i.MediaType) {
+	if i.SchemaVersion != schemaVersion || (i.MediaType != "" && !IsImageIndexMediaType(i.MediaType)) {
 		return ErrInvalidIndex
 	}
 

@@ -40,6 +40,14 @@ func TestIndexValidate(t *testing.T) {
 		t.Error("expected error for non-index mediaType")
 	}
 
+	// mediaType is optional per the OCI image-index spec: empty is valid.
+	empty := validIndex()
+
+	empty.MediaType = ""
+	if err := empty.Validate(); err != nil {
+		t.Errorf("empty mediaType should be accepted, got %v", err)
+	}
+
 	bad = validIndex()
 
 	bad.Manifests[0].Digest = "not-a-digest"
