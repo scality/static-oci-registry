@@ -12,6 +12,7 @@ var (
 	ErrInvalidDigest             = errors.New("invalid digest")
 	ErrInvalidManifestDescriptor = errors.New("invalid manifest descriptor")
 	ErrInvalidManifest           = errors.New("invalid manifest")
+	ErrInvalidIndex              = errors.New("invalid image index")
 	ErrManifestNotFound          = errors.New("manifest not found in registry")
 	ErrInvalidReference          = errors.New("invalid or missing reference")
 	ErrBlobNotFound              = errors.New("blob not found in registry")
