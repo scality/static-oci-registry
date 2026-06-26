@@ -9,11 +9,12 @@ IMAGES := \
   'my-solution v3.0.0-rc1 docker.io/library/alpine 3.21' \
   'my-solution v4.5.0 docker.io/library/alpine 3.22'
 
-DOCKER_HOST ?= unix:///var/run/docker.sock
 SKOPEO ?= skopeo
-SKOPEO_FLAGS ?= --format v2s2 --dest-compress --src-daemon-host $(DOCKER_HOST) --insecure-policy
+SKOPEO_FLAGS ?= --all --insecure-policy
 
+DOCKER_HOST ?= unix:///var/run/docker.sock
 TEST_DOCKERFILE ?= ./test/target.Dockerfile
+
 TEST_DIR ?= ./_testfs
 CERT_DIR ?= ./_certs
 
@@ -34,10 +35,9 @@ testfs: clean
 		version=$$2; \
 		image=$$3; \
 		tag=$$4; \
-		docker build -f ./test/target.Dockerfile --build-arg VERSION=$$tag -t test-image:$$tag .; \
 		mkdir -p $(TEST_DIR)/$$solution/$$version/$$image; \
-		$(SKOPEO) copy $(SKOPEO_FLAGS) docker-daemon:test-image:$$tag dir:$(TEST_DIR)/$$solution/$$version/$$image/$$tag; \
-	done > /dev/null
+		$(SKOPEO) copy $(SKOPEO_FLAGS) docker://$$image:$$tag oci:$(TEST_DIR)/$$solution/$$version/$$image:$$tag; \
+	done
 	@echo
 	@echo "Created test filesystem in $(TEST_DIR), use:"
 	@echo "FS_ROOT=$(TEST_DIR)"
@@ -72,7 +72,7 @@ JUNIT_REPORT_DIR ?= .
 
 .PHONY: unit-test
 unit-test:
-	DOCKER_HOST=$(DOCKER_HOST) TARGET_DOCKERFILE=$(realpath $(TEST_DOCKERFILE)) ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-unit.xml test/unit
+	ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-unit.xml test/unit
 
 .PHONY: integration-test
 integration-test:
