@@ -9,20 +9,21 @@ import (
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/digestmanifestfetcher"
-	"github.com/scality/static-oci-registry/pkg/infrastructure/ocilayout"
+	"github.com/scality/static-oci-registry/pkg/service/mocks"
 	"github.com/scality/static-oci-registry/test/utils"
+	mock "github.com/stretchr/testify/mock"
 )
 
-var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
+var _ = Describe("Fetch Manifest From Digest", func() {
 	var (
-		mockWalker *ocilayout.MockWalker
+		mockWalker *mocks.MockLayoutWalker
 		fetcher    *digestmanifestfetcher.FileSystem
 		image      domain.ImageName
 	)
 
 	BeforeEach(func() {
 		image = "docker.io/library/alpine"
-		mockWalker = ocilayout.NewMockWalker()
+		mockWalker = mocks.NewMockLayoutWalker(GinkgoT())
 
 		var err error
 
@@ -35,13 +36,13 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 			It("returns the manifest output from that layout", func() {
 				dgst := sha256Digest([]byte(validManifestJSON))
 
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.ByDigest[dgst] = &domain.FetchManifestOutput{
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageManifest,
 					ContentDigest: dgst,
 					ManifestBytes: []byte(validManifestJSON),
-				}
-				mockWalker.Add(layoutA)
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
@@ -57,13 +58,13 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 				indexBytes := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}`)
 				dgst := sha256Digest(indexBytes)
 
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.ByDigest[dgst] = &domain.FetchManifestOutput{
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageIndex,
 					ContentDigest: dgst,
 					ManifestBytes: indexBytes,
-				}
-				mockWalker.Add(layoutA)
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
@@ -78,18 +79,17 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 			It("returns the output from the second layout", func() {
 				dgst := sha256Digest([]byte(validManifestJSON))
 
-				layoutA := ocilayout.NewMockLayout()
-				// ByDigest empty -- ReadManifestByDigest returns (nil, nil)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, nil)
 
-				layoutB := ocilayout.NewMockLayout()
-				layoutB.ByDigest[dgst] = &domain.FetchManifestOutput{
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageManifest,
 					ContentDigest: dgst,
 					ManifestBytes: []byte(validManifestJSON),
-				}
+				}, nil)
 
-				mockWalker.Add(layoutA)
-				mockWalker.Add(layoutB)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
@@ -104,9 +104,9 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 			It("returns MANIFEST_UNKNOWN wrapping ErrManifestNotFound", func() {
 				dgst := sha256Digest([]byte("nothing"))
 
-				layoutA := ocilayout.NewMockLayout()
-				// ByDigest empty -- not present
-				mockWalker.Add(layoutA)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				_, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).To(HaveOccurred())
@@ -117,6 +117,8 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 
 		When("the walker yields no layouts at all", func() {
 			It("returns MANIFEST_UNKNOWN wrapping ErrManifestNotFound", func() {
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq())
+
 				_, err := fetcher.FetchManifest(context.Background(), image, sha256Digest([]byte("nothing")))
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
@@ -124,14 +126,14 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 			})
 		})
 
-		When("an unsupported algorithm digest is requested (not in any layout's ByDigest)", func() {
+		When("an unsupported algorithm digest is requested (not in any layout's index)", func() {
 			It("returns MANIFEST_UNKNOWN without special-casing the algorithm", func() {
 				// sha512 digest not registered in any layout -- naturally returns not found.
 				dgst := sha512Digest([]byte(validManifestJSON))
 
-				layoutA := ocilayout.NewMockLayout()
-				// ByDigest is empty, so dgst is not reachable
-				mockWalker.Add(layoutA)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				_, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).To(HaveOccurred())
@@ -144,7 +146,7 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 	Context("Error propagation", func() {
 		When("the walker itself yields an error", func() {
 			It("propagates the wrapped error and aborts", func() {
-				mockWalker.WalkErr = errors.Wrap(domain.ErrRegistryInternal)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(errSeq(errors.Wrap(domain.ErrRegistryInternal)))
 
 				_, err := fetcher.FetchManifest(context.Background(), image,
 					sha256Digest([]byte(validManifestJSON)))
@@ -158,18 +160,18 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 			It("skips that layout and returns the result from the next one", func() {
 				dgst := sha256Digest([]byte(validManifestJSON))
 
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.DigestErr = errors.Wrap(domain.ErrRegistryInternal)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
+				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
 
-				layoutB := ocilayout.NewMockLayout()
-				layoutB.ByDigest[dgst] = &domain.FetchManifestOutput{
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageManifest,
 					ContentDigest: dgst,
 					ManifestBytes: []byte(validManifestJSON),
-				}
+				}, nil)
 
-				mockWalker.Add(layoutA)
-				mockWalker.Add(layoutB)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())

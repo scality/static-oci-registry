@@ -8,14 +8,15 @@ import (
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
-	"github.com/scality/static-oci-registry/pkg/infrastructure/ocilayout"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/tagmanifestfetcher"
+	"github.com/scality/static-oci-registry/pkg/service/mocks"
 	"github.com/scality/static-oci-registry/test/utils"
+	mock "github.com/stretchr/testify/mock"
 )
 
-var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
+var _ = Describe("Fetch Manifest From Tag", func() {
 	var (
-		mockWalker *ocilayout.MockWalker
+		mockWalker *mocks.MockLayoutWalker
 		fetcher    *tagmanifestfetcher.FileSystem
 		image      domain.ImageName
 		tag        domain.Tag
@@ -24,7 +25,7 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 	BeforeEach(func() {
 		image = "docker.io/library/alpine"
 		tag = "3.22"
-		mockWalker = ocilayout.NewMockWalker()
+		mockWalker = mocks.NewMockLayoutWalker(GinkgoT())
 
 		var err error
 
@@ -38,13 +39,13 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 	Context("Happy paths", func() {
 		When("a layout resolves the tag on the first candidate", func() {
 			It("returns the output from that layout", func() {
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.ByTag[tag] = &domain.FetchManifestOutput{
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageManifest,
 					ContentDigest: someDigest,
 					ManifestBytes: manifestBytes,
-				}
-				mockWalker.Add(layoutA)
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).NotTo(HaveOccurred())
@@ -57,18 +58,17 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 
 		When("the first layout lacks the tag but the second has it", func() {
 			It("returns the output from the second layout", func() {
-				layoutA := ocilayout.NewMockLayout()
-				// ByTag is empty -- ResolveTag returns (nil, nil)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(nil, nil)
 
-				layoutB := ocilayout.NewMockLayout()
-				layoutB.ByTag[tag] = &domain.FetchManifestOutput{
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageManifest,
 					ContentDigest: someDigest,
 					ManifestBytes: manifestBytes,
-				}
+				}, nil)
 
-				mockWalker.Add(layoutA)
-				mockWalker.Add(layoutB)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).NotTo(HaveOccurred())
@@ -82,13 +82,13 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 				indexDigest := domain.Digest("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 				indexBytes := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}`)
 
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.ByTag[tag] = &domain.FetchManifestOutput{
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageIndex,
 					ContentDigest: indexDigest,
 					ManifestBytes: indexBytes,
-				}
-				mockWalker.Add(layoutA)
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).NotTo(HaveOccurred())
@@ -103,9 +103,9 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 	Context("Not found cases", func() {
 		When("no layout has the tag", func() {
 			It("returns MANIFEST_UNKNOWN OCI error wrapping ErrManifestNotFound", func() {
-				layoutA := ocilayout.NewMockLayout()
-				// ByTag empty -- tag not present
-				mockWalker.Add(layoutA)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(nil, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				_, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).To(HaveOccurred())
@@ -116,7 +116,8 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 
 		When("the walker yields no layouts at all", func() {
 			It("returns MANIFEST_UNKNOWN OCI error wrapping ErrManifestNotFound", func() {
-				// mockWalker has no layouts added
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq())
+
 				_, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
@@ -128,7 +129,7 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 	Context("Error propagation", func() {
 		When("the walker itself yields an error", func() {
 			It("propagates the wrapped error and aborts", func() {
-				mockWalker.WalkErr = errors.Wrap(domain.ErrRegistryInternal)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(errSeq(errors.Wrap(domain.ErrRegistryInternal)))
 
 				_, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).To(HaveOccurred())
@@ -139,18 +140,18 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 
 		When("a layout's ResolveTag returns an error", func() {
 			It("skips that layout and returns the result from the next one", func() {
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.ResolveErr = errors.Wrap(domain.ErrRegistryInternal)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
+				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
 
-				layoutB := ocilayout.NewMockLayout()
-				layoutB.ByTag[tag] = &domain.FetchManifestOutput{
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
 					MediaType:     domain.MediaTypeOCIImageManifest,
 					ContentDigest: someDigest,
 					ManifestBytes: manifestBytes,
-				}
+				}, nil)
 
-				mockWalker.Add(layoutA)
-				mockWalker.Add(layoutB)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).NotTo(HaveOccurred())

@@ -9,20 +9,21 @@ import (
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/blobpuller"
-	"github.com/scality/static-oci-registry/pkg/infrastructure/ocilayout"
+	"github.com/scality/static-oci-registry/pkg/service/mocks"
 	"github.com/scality/static-oci-registry/test/utils"
+	mock "github.com/stretchr/testify/mock"
 )
 
-var _ = Describe("Pull Blob", Ordered, func() {
+var _ = Describe("Pull Blob", func() {
 	var (
-		mockWalker *ocilayout.MockWalker
+		mockWalker *mocks.MockLayoutWalker
 		puller     *blobpuller.FileSystem
 		image      domain.ImageName
 	)
 
 	BeforeEach(func() {
 		image = "docker.io/library/alpine"
-		mockWalker = ocilayout.NewMockWalker()
+		mockWalker = mocks.NewMockLayoutWalker(GinkgoT())
 
 		var err error
 
@@ -36,9 +37,9 @@ var _ = Describe("Pull Blob", Ordered, func() {
 				blobContent := []byte("blob-content")
 				dgst := sha256Digest(blobContent)
 
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.Blobs[dgst] = blobContent
-				mockWalker.Add(layoutA)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().OpenBlob(mock.Anything, dgst).Return(blobReader(blobContent), nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				rc, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
@@ -57,14 +58,13 @@ var _ = Describe("Pull Blob", Ordered, func() {
 				blobContent := []byte("blob-content")
 				dgst := sha256Digest(blobContent)
 
-				layoutA := ocilayout.NewMockLayout()
-				// layoutA.Blobs is empty -- OpenBlob returns (nil, nil)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().OpenBlob(mock.Anything, dgst).Return(nil, nil)
 
-				layoutB := ocilayout.NewMockLayout()
-				layoutB.Blobs[dgst] = blobContent
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().OpenBlob(mock.Anything, dgst).Return(blobReader(blobContent), nil)
 
-				mockWalker.Add(layoutA)
-				mockWalker.Add(layoutB)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
 				rc, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
@@ -83,14 +83,14 @@ var _ = Describe("Pull Blob", Ordered, func() {
 				blobContent := []byte("blob-content")
 				dgst := sha256Digest(blobContent)
 
-				layoutA := ocilayout.NewMockLayout()
-				layoutA.BlobErr = errors.Wrap(domain.ErrRegistryInternal)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().OpenBlob(mock.Anything, dgst).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
+				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
 
-				layoutB := ocilayout.NewMockLayout()
-				layoutB.Blobs[dgst] = blobContent
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().OpenBlob(mock.Anything, dgst).Return(blobReader(blobContent), nil)
 
-				mockWalker.Add(layoutA)
-				mockWalker.Add(layoutB)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
 				rc, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
@@ -111,9 +111,9 @@ var _ = Describe("Pull Blob", Ordered, func() {
 				blobContent := []byte("blob-content")
 				dgst := sha256Digest(blobContent)
 
-				layoutA := ocilayout.NewMockLayout()
-				// Blobs is empty -- every OpenBlob returns (nil, nil)
-				mockWalker.Add(layoutA)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().OpenBlob(mock.Anything, dgst).Return(nil, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				_, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).To(HaveOccurred())
@@ -127,7 +127,7 @@ var _ = Describe("Pull Blob", Ordered, func() {
 				blobContent := []byte("blob-content")
 				dgst := sha256Digest(blobContent)
 
-				// mockWalker has no layouts added
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq())
 
 				_, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).To(HaveOccurred())
@@ -140,7 +140,7 @@ var _ = Describe("Pull Blob", Ordered, func() {
 	Context("Terminal errors", func() {
 		When("the walker yields an error", func() {
 			It("propagates the wrapped error", func() {
-				mockWalker.WalkErr = errors.Wrap(domain.ErrRegistryInternal)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(errSeq(errors.Wrap(domain.ErrRegistryInternal)))
 
 				blobContent := []byte("blob-content")
 				dgst := sha256Digest(blobContent)
