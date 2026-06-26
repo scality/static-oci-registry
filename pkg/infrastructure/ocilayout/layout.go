@@ -3,12 +3,14 @@ package ocilayout
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
+	"github.com/scality/static-oci-registry/pkg/service"
 )
 
 const (
@@ -28,6 +30,8 @@ type Layout struct {
 
 	index *domain.Index // lazily loaded, request-scoped cache
 }
+
+var _ service.Layout = (*Layout)(nil)
 
 func NewLayout(logger *slog.Logger, root *os.Root, path string) *Layout {
 	return &Layout{
@@ -216,18 +220,18 @@ func (l *Layout) reachableManifests(ctx context.Context) ([]domain.ManifestDescr
 		queue = append(queue, manifestNode{desc: m, depth: 0})
 	}
 
-	visited := make(map[domain.Digest]bool)
+	visited := make(map[domain.Digest]struct{})
 	out := make([]domain.ManifestDescriptor, 0, len(queue))
 
 	for len(queue) > 0 {
 		n := queue[0]
 		queue = queue[1:]
 
-		if visited[n.desc.Digest] {
+		if _, seen := visited[n.desc.Digest]; seen {
 			continue
 		}
 
-		visited[n.desc.Digest] = true
+		visited[n.desc.Digest] = struct{}{}
 		out = append(out, n.desc)
 
 		if domain.IsImageIndexMediaType(n.desc.MediaType) {
@@ -264,4 +268,100 @@ func (l *Layout) ReadManifestByDigest(
 	}
 
 	return nil, nil //nolint:nilnil // (nil,nil) means "unreachable here, try next candidate"
+}
+
+// addManifestBlobs reads and parses the image manifest at d.Digest and adds
+// its config, layer, and subject digests to set. Read/unmarshal errors are
+// soft-failed: logged and skipped so one bad blob never aborts the walk.
+func (l *Layout) addManifestBlobs(
+	ctx context.Context, d domain.ManifestDescriptor, set map[domain.Digest]struct{},
+) {
+	raw, err := l.readBlob(d.Digest)
+	if err != nil {
+		l.logger.WarnContext(ctx, "failed to read reachable manifest blob, skipping",
+			slog.String("digest", d.Digest.String()), slog.Any("error", err))
+
+		return
+	}
+
+	var m domain.Manifest
+	if err := json.Unmarshal(raw, &m); err != nil {
+		l.logger.WarnContext(ctx, "failed to unmarshal reachable manifest, skipping",
+			slog.String("digest", d.Digest.String()), slog.Any("error", err))
+
+		return
+	}
+
+	if m.Config != nil {
+		set[m.Config.Digest] = struct{}{}
+	}
+
+	for _, layer := range m.Layers {
+		set[layer.Digest] = struct{}{}
+	}
+
+	if m.Subject != nil {
+		set[m.Subject.Digest] = struct{}{}
+	}
+}
+
+// authorizedBlobs returns the set of blob digests that may be served: the
+// config, layers, and subject of every reachable image manifest. Manifest/
+// index blobs are intentionally excluded (served via the manifest endpoint).
+func (l *Layout) authorizedBlobs(ctx context.Context) (map[domain.Digest]struct{}, error) {
+	descs, err := l.reachableManifests(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	set := make(map[domain.Digest]struct{})
+
+	for _, d := range descs {
+		// Skip indexes: they carry no blobs of their own and their child
+		// manifests are already in descs. Everything else is treated as an
+		// image manifest and mined for its config/layers/subject.
+		if domain.IsImageIndexMediaType(d.MediaType) {
+			continue
+		}
+
+		l.addManifestBlobs(ctx, d, set)
+	}
+
+	return set, nil
+}
+
+func (l *Layout) OpenBlob(ctx context.Context, digest domain.Digest) (io.ReadSeekCloser, error) {
+	path, err := l.blobPath(digest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cheap existence check first: if the blob isn't in this layout's store,
+	// there is no point computing the authorized set (which parses manifests) —
+	// let the caller try the next candidate.
+	info, err := l.root.Stat(path)
+	if err != nil || info.IsDir() {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			l.logger.WarnContext(ctx, "failed to stat blob, skipping",
+				slog.String("path", path), slog.Any("error", err))
+		}
+
+		return nil, nil //nolint:nilnil // not present here, try next candidate
+	}
+
+	authorized, err := l.authorizedBlobs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := authorized[digest]; !ok {
+		return nil, nil //nolint:nilnil // present but unreferenced — not authorized here
+	}
+
+	file, err := l.root.Open(path)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.WithDetail("failed to open authorized blob"))
+	}
+
+	return file, nil
 }

@@ -1,6 +1,7 @@
 package ocilayout_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -119,6 +120,14 @@ func TestLayoutTags(t *testing.T) {
 			Annotations: map[string]string{domain.RefNameAnnotation: "3.22"},
 		},
 		{MediaType: domain.MediaTypeOCIImageManifest, Digest: mDigest, Size: mSize}, // untagged → ignored
+		{
+			MediaType: domain.MediaTypeOCIImageManifest, Digest: mDigest, Size: mSize,
+			Annotations: map[string]string{domain.RefNameAnnotation: ""}, // empty ref.name → skipped
+		},
+		{
+			MediaType: domain.MediaTypeOCIImageManifest, Digest: mDigest, Size: mSize,
+			Annotations: map[string]string{domain.RefNameAnnotation: "bad tag with spaces"}, // invalid → skipped
+		},
 	})
 
 	tags, err := b.layout(t).Tags(context.Background())
@@ -129,8 +138,6 @@ func TestLayoutTags(t *testing.T) {
 	if len(tags) != 1 || tags[0] != domain.Tag("3.22") {
 		t.Fatalf("got tags %v, want [3.22]", tags)
 	}
-
-	_ = io.Discard
 }
 
 func TestLayoutResolveTag(t *testing.T) {
@@ -158,6 +165,11 @@ func TestLayoutResolveTag(t *testing.T) {
 
 	if out.MediaType != domain.MediaTypeOCIImageManifest || out.ContentDigest != mDigest {
 		t.Fatalf("unexpected output: %+v", out)
+	}
+
+	wantRaw, _ := json.Marshal(manifest)
+	if !bytes.Equal(out.ManifestBytes, wantRaw) {
+		t.Fatalf("ManifestBytes mismatch for resolved tag")
 	}
 
 	absent, err := l.ResolveTag(context.Background(), domain.Tag("nope"))
@@ -215,6 +227,11 @@ func TestLayoutReadManifestByDigest_MultiArch(t *testing.T) {
 	if out.MediaType != domain.MediaTypeOCIImageManifest || out.ContentDigest != mB {
 		t.Fatalf("unexpected sub-manifest output: %+v", out)
 	}
+
+	wantRaw, _ := json.Marshal(imageManifest(cfgB, layerB))
+	if !bytes.Equal(out.ManifestBytes, wantRaw) {
+		t.Fatalf("sub-manifest ManifestBytes mismatch")
+	}
 	// a random digest is not reachable
 	absent := domain.Digest("sha256:" + "00000000000000000000000000000000000000000000000000000000000000aa")
 	if out, err := l.ReadManifestByDigest(ctx, absent); err != nil || out != nil {
@@ -237,5 +254,57 @@ func TestLayoutReachableCycleGuard(t *testing.T) {
 	out, err := b.layout(t).ReadManifestByDigest(context.Background(), m)
 	if err != nil || out == nil {
 		t.Fatalf("expected reachable manifest, got out=%v err=%v", out, err)
+	}
+}
+
+func TestLayoutOpenBlob(t *testing.T) {
+	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	cfg := b.putBlob(t, []byte("config-bytes"))
+	layer := b.putBlob(t, []byte("layer-bytes"))
+	m, size := b.putJSON(t, imageManifest(cfg, layer))
+	// stray blob not referenced by any manifest
+	stray := b.putBlob(t, []byte("stray"))
+	b.writeIndex(t, []domain.ManifestDescriptor{
+		{
+			MediaType: domain.MediaTypeOCIImageManifest, Digest: m, Size: size,
+			Annotations: map[string]string{domain.RefNameAnnotation: "3.22"},
+		},
+	})
+	l := b.layout(t)
+	ctx := context.Background()
+
+	rc, err := l.OpenBlob(ctx, layer)
+	if err != nil || rc == nil {
+		t.Fatalf("layer blob should be authorized: rc=%v err=%v", rc, err)
+	}
+
+	got, _ := io.ReadAll(rc)
+	_ = rc.Close()
+
+	if string(got) != "layer-bytes" {
+		t.Fatalf("unexpected blob content %q", got)
+	}
+
+	// config is authorized too
+	if rc, err := l.OpenBlob(ctx, cfg); err != nil || rc == nil {
+		t.Fatalf("config blob should be authorized: rc=%v err=%v", rc, err)
+	} else {
+		_ = rc.Close()
+	}
+
+	// stray blob is NOT authorized
+	if rc, err := l.OpenBlob(ctx, stray); err != nil || rc != nil {
+		t.Fatalf("stray blob must not be served: rc=%v err=%v", rc, err)
+	}
+
+	// manifest blob must NOT be served via the blob endpoint (security property)
+	if rc, err := l.OpenBlob(ctx, m); err != nil || rc != nil {
+		t.Fatalf("manifest blob must not be served via blob endpoint: rc=%v err=%v", rc, err)
+	}
+
+	// a digest with no blob file on disk returns (nil,nil) via the early existence check
+	absent := domain.Digest("sha256:00000000000000000000000000000000000000000000000000000000000000ff")
+	if rc, err := l.OpenBlob(ctx, absent); err != nil || rc != nil {
+		t.Fatalf("absent blob must not be served: rc=%v err=%v", rc, err)
 	}
 }
