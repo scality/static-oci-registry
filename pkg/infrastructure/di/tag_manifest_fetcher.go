@@ -11,7 +11,7 @@ func (c *Container) getTagManifestFetcher() *tagmanifestfetcher.FileSystem {
 	if c.tagManifestFetcher == nil {
 		l, err := tagmanifestfetcher.NewFileSystem(
 			c.GetLogger(),
-			c.getTagWalker(),
+			c.getLayoutWalker(),
 		)
 		if err != nil {
 			c.GetLogger().ErrorContext(c.ctx, "failed to create tag manifest fetcher",
