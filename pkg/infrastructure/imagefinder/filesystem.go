@@ -11,6 +11,7 @@ import (
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
+	"github.com/scality/static-oci-registry/pkg/service"
 
 	"github.com/hashicorp/go-version"
 )
@@ -19,6 +20,8 @@ type FileSystem struct {
 	logger *slog.Logger
 	root   *os.Root
 }
+
+var _ service.ImageFinder = (*FileSystem)(nil)
 
 func NewFileSystem(
 	logger *slog.Logger,
@@ -143,6 +146,11 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 				continue
 			}
 
+			base := solution.Name() + "/" + candidate.Name() + "/" + string(imageName)
+			if !fs.isLayout(ctx, l, base) {
+				continue
+			}
+
 			found[solution.Name()] = append(found[solution.Name()], domain.SolutionVersion{
 				Solution: solution.Name(),
 				Version:  candidate.Name(),
@@ -182,4 +190,20 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 	}
 
 	return sorted, nil
+}
+
+// isLayout reports whether base is an OCI Image Layout (has oci-layout and
+// index.json). Stray directories that are not layouts are skipped.
+func (fs *FileSystem) isLayout(ctx context.Context, l *slog.Logger, base string) bool {
+	for _, marker := range []string{"oci-layout", "index.json"} {
+		info, err := fs.root.Stat(base + "/" + marker)
+		if err != nil || info.IsDir() {
+			l.WarnContext(ctx, "image directory is not an OCI layout, skipping",
+				slog.String("path", base), slog.String("missing", marker))
+
+			return false
+		}
+	}
+
+	return true
 }
