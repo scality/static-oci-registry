@@ -15,7 +15,7 @@ const (
 	indexFileName = "index.json"
 	blobsDirName  = "blobs"
 	// maxIndexDepth bounds nested-index traversal (image-spec allows nesting).
-	maxIndexDepth = 4 //nolint:unused // used by Tasks 5-7 (ResolveTag, ReadManifestByDigest, OpenBlob)
+	maxIndexDepth = 4
 )
 
 // Layout is a request-scoped reader over one image's OCI Image Layout. It
@@ -148,4 +148,120 @@ func (l *Layout) ResolveTag(
 	}
 
 	return nil, nil //nolint:nilnil // (nil,nil) means "tag absent here, try next candidate"
+}
+
+// manifestNode is an entry in the reachableManifests traversal queue: a
+// descriptor together with its nesting depth in the index graph.
+type manifestNode struct {
+	desc  domain.ManifestDescriptor
+	depth int
+}
+
+// expandIndex reads the nested index at n.desc.Digest and returns its child
+// descriptors as new queue nodes at depth n.depth+1. The nested index is
+// validated like the top-level one (readIndex). Read, parse, and validation
+// errors are soft-failed: logged as warnings and nil returned so one bad blob
+// never aborts the walk.
+func (l *Layout) expandIndex(ctx context.Context, n manifestNode) []manifestNode {
+	if n.depth >= maxIndexDepth {
+		l.logger.WarnContext(ctx, "nested index too deep, not descending",
+			slog.String("digest", n.desc.Digest.String()), slog.Int("depth", n.depth))
+
+		return nil
+	}
+
+	raw, err := l.readBlob(n.desc.Digest)
+	if err != nil {
+		l.logger.WarnContext(ctx, "failed to read nested index blob, skipping",
+			slog.String("digest", n.desc.Digest.String()), slog.Any("error", err))
+
+		return nil
+	}
+
+	var sub domain.Index
+	if err := json.Unmarshal(raw, &sub); err != nil {
+		l.logger.WarnContext(ctx, "failed to unmarshal nested index, skipping",
+			slog.String("digest", n.desc.Digest.String()), slog.Any("error", err))
+
+		return nil
+	}
+
+	if err := sub.Validate(); err != nil {
+		l.logger.WarnContext(ctx, "invalid nested index, skipping",
+			slog.String("digest", n.desc.Digest.String()), slog.Any("error", err))
+
+		return nil
+	}
+
+	children := make([]manifestNode, len(sub.Manifests))
+	for i, m := range sub.Manifests {
+		children[i] = manifestNode{desc: m, depth: n.depth + 1}
+	}
+
+	return children
+}
+
+// reachableManifests returns every manifest/index descriptor reachable from
+// index.json (entries plus the contents of nested indexes). Traversal is
+// bounded by maxIndexDepth and guarded against cycles. Unreadable or malformed
+// nested indexes are logged and skipped (soft-fail).
+func (l *Layout) reachableManifests(ctx context.Context) ([]domain.ManifestDescriptor, error) {
+	idx, err := l.readIndex(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queue := make([]manifestNode, 0, len(idx.Manifests))
+	for _, m := range idx.Manifests {
+		queue = append(queue, manifestNode{desc: m, depth: 0})
+	}
+
+	visited := make(map[domain.Digest]bool)
+	out := make([]domain.ManifestDescriptor, 0, len(queue))
+
+	for len(queue) > 0 {
+		n := queue[0]
+		queue = queue[1:]
+
+		if visited[n.desc.Digest] {
+			continue
+		}
+
+		visited[n.desc.Digest] = true
+		out = append(out, n.desc)
+
+		if domain.IsImageIndexMediaType(n.desc.MediaType) {
+			queue = append(queue, l.expandIndex(ctx, n)...)
+		}
+	}
+
+	return out, nil
+}
+
+func (l *Layout) ReadManifestByDigest(
+	ctx context.Context, digest domain.Digest,
+) (*domain.FetchManifestOutput, error) {
+	descs, err := l.reachableManifests(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, d := range descs {
+		if d.Digest != digest {
+			continue
+		}
+
+		raw, err := l.readBlob(digest)
+		if err != nil {
+			return nil, err
+		}
+
+		return &domain.FetchManifestOutput{
+			MediaType:     d.MediaType,
+			ContentDigest: digest,
+			ManifestBytes: raw,
+		}, nil
+	}
+
+	return nil, nil //nolint:nilnil // (nil,nil) means "unreachable here, try next candidate"
 }

@@ -22,7 +22,7 @@ type layoutBuilder struct {
 	imageDir string // <solution>/<version>/<image> relative to root
 }
 
-func newLayoutBuilder(t *testing.T, imageDir string) *layoutBuilder {
+func newLayoutBuilder(t *testing.T, imageDir string) *layoutBuilder { //nolint:unparam // imageDir will vary across future tests
 	t.Helper()
 	root := t.TempDir()
 
@@ -167,5 +167,75 @@ func TestLayoutResolveTag(t *testing.T) {
 
 	if absent != nil {
 		t.Fatalf("expected nil for absent tag, got %+v", absent)
+	}
+}
+
+func TestLayoutReadManifestByDigest_MultiArch(t *testing.T) {
+	b := newLayoutBuilder(t, "sol/1.0.0/img")
+
+	// two per-platform image manifests
+	cfgA := b.putBlob(t, []byte("configA"))
+	layerA := b.putBlob(t, []byte("layerA"))
+	mA, sizeA := b.putJSON(t, imageManifest(cfgA, layerA))
+
+	cfgB := b.putBlob(t, []byte("configB"))
+	layerB := b.putBlob(t, []byte("layerB"))
+	mB, sizeB := b.putJSON(t, imageManifest(cfgB, layerB))
+
+	// an image index referencing both, stored as a blob
+	subIndex := domain.Index{
+		SchemaVersion: 2, MediaType: domain.MediaTypeOCIImageIndex,
+		Manifests: []domain.ManifestDescriptor{
+			{MediaType: domain.MediaTypeOCIImageManifest, Digest: mA, Size: sizeA},
+			{MediaType: domain.MediaTypeOCIImageManifest, Digest: mB, Size: sizeB},
+		},
+	}
+	idxDigest, idxSize := b.putJSON(t, subIndex)
+
+	// top-level index.json: tag points at the index blob
+	b.writeIndex(t, []domain.ManifestDescriptor{
+		{
+			MediaType: domain.MediaTypeOCIImageIndex, Digest: idxDigest, Size: idxSize,
+			Annotations: map[string]string{domain.RefNameAnnotation: "3.22"},
+		},
+	})
+	l := b.layout(t)
+	ctx := context.Background()
+
+	// the index itself is reachable by digest
+	if out, err := l.ReadManifestByDigest(ctx, idxDigest); err != nil || out == nil {
+		t.Fatalf("index digest not reachable: out=%v err=%v", out, err)
+	}
+	// a per-platform sub-manifest is reachable by digest
+	out, err := l.ReadManifestByDigest(ctx, mB)
+	if err != nil || out == nil {
+		t.Fatalf("sub-manifest not reachable: out=%v err=%v", out, err)
+	}
+
+	if out.MediaType != domain.MediaTypeOCIImageManifest || out.ContentDigest != mB {
+		t.Fatalf("unexpected sub-manifest output: %+v", out)
+	}
+	// a random digest is not reachable
+	absent := domain.Digest("sha256:" + "00000000000000000000000000000000000000000000000000000000000000aa")
+	if out, err := l.ReadManifestByDigest(ctx, absent); err != nil || out != nil {
+		t.Fatalf("unexpected reachable: out=%v err=%v", out, err)
+	}
+}
+
+func TestLayoutReachableCycleGuard(t *testing.T) {
+	// Content addressing makes true cycles impossible to construct, so assert
+	// that duplicate descriptors terminate and dedupe rather than loop.
+	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	cfg := b.putBlob(t, []byte("config"))
+	layer := b.putBlob(t, []byte("layer"))
+	m, size := b.putJSON(t, imageManifest(cfg, layer))
+	b.writeIndex(t, []domain.ManifestDescriptor{
+		{MediaType: domain.MediaTypeOCIImageManifest, Digest: m, Size: size},
+		{MediaType: domain.MediaTypeOCIImageManifest, Digest: m, Size: size}, // duplicate
+	})
+
+	out, err := b.layout(t).ReadManifestByDigest(context.Background(), m)
+	if err != nil || out == nil {
+		t.Fatalf("expected reachable manifest, got out=%v err=%v", out, err)
 	}
 }
