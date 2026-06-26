@@ -132,3 +132,40 @@ func TestLayoutTags(t *testing.T) {
 
 	_ = io.Discard
 }
+
+func TestLayoutResolveTag(t *testing.T) {
+	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	cfg := b.putBlob(t, []byte("config"))
+	layer := b.putBlob(t, []byte("layer"))
+	manifest := imageManifest(cfg, layer)
+	mDigest, mSize := b.putJSON(t, manifest)
+	b.writeIndex(t, []domain.ManifestDescriptor{
+		{
+			MediaType: domain.MediaTypeOCIImageManifest, Digest: mDigest, Size: mSize,
+			Annotations: map[string]string{domain.RefNameAnnotation: "3.22"},
+		},
+	})
+	l := b.layout(t)
+
+	out, err := l.ResolveTag(context.Background(), domain.Tag("3.22"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if out == nil {
+		t.Fatal("expected a result for tag 3.22")
+	}
+
+	if out.MediaType != domain.MediaTypeOCIImageManifest || out.ContentDigest != mDigest {
+		t.Fatalf("unexpected output: %+v", out)
+	}
+
+	absent, err := l.ResolveTag(context.Background(), domain.Tag("nope"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if absent != nil {
+		t.Fatalf("expected nil for absent tag, got %+v", absent)
+	}
+}

@@ -94,8 +94,6 @@ func (l *Layout) Tags(ctx context.Context) ([]domain.Tag, error) {
 }
 
 // blobPath returns "<path>/blobs/<algo>/<encoded>" for the given digest.
-//
-//nolint:unused // used by Tasks 6-7 (ReadManifestByDigest, OpenBlob)
 func (l *Layout) blobPath(digest domain.Digest) (string, error) {
 	algo, err := digest.Algorithm()
 	if err != nil {
@@ -110,7 +108,6 @@ func (l *Layout) blobPath(digest domain.Digest) (string, error) {
 	return strings.Join([]string{l.path, blobsDirName, algo, encoded}, "/"), nil
 }
 
-//nolint:unused // used by Tasks 6-7 (ReadManifestByDigest, OpenBlob)
 func (l *Layout) readBlob(digest domain.Digest) ([]byte, error) {
 	path, err := l.blobPath(digest)
 	if err != nil {
@@ -123,4 +120,32 @@ func (l *Layout) readBlob(digest domain.Digest) ([]byte, error) {
 	}
 
 	return raw, nil
+}
+
+func (l *Layout) ResolveTag(
+	ctx context.Context, tag domain.Tag,
+) (*domain.FetchManifestOutput, error) {
+	idx, err := l.readIndex(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, m := range idx.Manifests {
+		if m.Annotations[domain.RefNameAnnotation] != tag.String() {
+			continue
+		}
+
+		raw, err := l.readBlob(m.Digest)
+		if err != nil {
+			return nil, err
+		}
+
+		return &domain.FetchManifestOutput{
+			MediaType:     m.MediaType,
+			ContentDigest: m.Digest,
+			ManifestBytes: raw,
+		}, nil
+	}
+
+	return nil, nil //nolint:nilnil // (nil,nil) means "tag absent here, try next candidate"
 }
