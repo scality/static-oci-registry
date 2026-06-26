@@ -32,3 +32,17 @@ The same logic must be followed when implementing registry discovery endpoints (
 This registry is a server built using Go. It uses a clean architecture paradigm.
 for now, it only supports reading registry contents from a filesystem but the clean architecture makes
 it extensible for other kinds of content sources.
+
+> [!NOTE]
+> **On-disk format.** Each leaf `<image>/` directory is an
+> [OCI Image Layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md) -
+> an `oci-layout` marker file, an `index.json`, and a shared `blobs/` store - not per-tag
+> directories. Tags are expressed as `org.opencontainers.image.ref.name` annotations on
+> entries in `index.json`.
+>
+> Multi-arch images are served by returning the image index at the tag endpoint; clients
+> resolve the per-platform manifest by digest in a follow-up request. The registry never
+> selects a platform - that is the client's responsibility.
+>
+> All reads are performed on demand from disk (disk is the source of truth), so solutions,
+> versions, images, and tags can be added or removed without restarting the server.
