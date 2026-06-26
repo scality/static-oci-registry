@@ -1,4 +1,3 @@
-// nolint:cyclop // this is complex infrastructure logic by nature
 package taglister
 
 import (
@@ -11,21 +10,23 @@ import (
 	"github.com/scality/static-oci-registry/pkg/service"
 )
 
+// FileSystem lists tags by walking all OCI Image Layout candidates for an image.
 type FileSystem struct {
-	logger    *slog.Logger
-	tagWalker service.TagWalker
+	logger       *slog.Logger
+	layoutWalker service.LayoutWalker
 }
 
-func NewFileSystem(
-	logger *slog.Logger,
-	tagWalker service.TagWalker,
-) (*FileSystem, error) {
+var _ service.TagLister = (*FileSystem)(nil)
+
+// NewFileSystem creates a FileSystem tag lister backed by the given LayoutWalker.
+func NewFileSystem(logger *slog.Logger, layoutWalker service.LayoutWalker) (*FileSystem, error) {
 	return &FileSystem{
-		logger:    logger.With(slog.String("tag_lister", "filesystem")),
-		tagWalker: tagWalker,
+		logger:       logger.With(slog.String("tag_lister", "filesystem")),
+		layoutWalker: layoutWalker,
 	}, nil
 }
 
+// ListTags returns a sorted, deduplicated list of tags for the given image.
 func (fs *FileSystem) ListTags(ctx context.Context, imageName domain.ImageName) (
 	*domain.ListTagsOutput, error,
 ) {
@@ -34,24 +35,31 @@ func (fs *FileSystem) ListTags(ctx context.Context, imageName domain.ImageName) 
 
 	var allTags []domain.Tag
 
-	for entry, err := range fs.tagWalker.WalkTags(ctx, imageName) {
+	for layout, err := range fs.layoutWalker.WalkLayouts(ctx, imageName) {
 		if err != nil {
-			return nil, errors.Wrap(
-				err,
-				errors.WithDetail("failure while walking tags in filesystem registry"),
-			)
+			return nil, errors.Wrap(err,
+				errors.WithDetail("failure while walking layouts in filesystem registry"))
 		}
 
-		if slices.Contains(allTags, entry.Tag) {
-			l.With(slog.String("tag", entry.Tag.String())).WarnContext(ctx, "duplicate tag found, skipping")
+		tags, err := layout.Tags(ctx)
+		if err != nil {
+			l.WarnContext(ctx, "failed to read tags from a layout, skipping",
+				slog.String("layout", layout.Location()), slog.Any("error", err))
 
 			continue
 		}
 
-		allTags = append(allTags, entry.Tag)
+		for _, t := range tags {
+			if slices.Contains(allTags, t) {
+				l.With(slog.String("tag", t.String())).WarnContext(ctx, "duplicate tag found, skipping")
+
+				continue
+			}
+
+			allTags = append(allTags, t)
+		}
 	}
 
-	// sort Tags
 	slices.SortFunc(allTags, domain.CompareTags)
 
 	return &domain.ListTagsOutput{Name: imageName, Tags: allTags}, nil

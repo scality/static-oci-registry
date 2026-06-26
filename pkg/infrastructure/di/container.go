@@ -11,6 +11,7 @@ import (
 	"github.com/scality/static-oci-registry/pkg/infrastructure/blobpuller"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/digestmanifestfetcher"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/layoutwalker"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/tagmanifestfetcher"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/tagwalker"
@@ -41,6 +42,7 @@ type Container struct {
 	pullBlobUseCase                *usecase.PullBlob
 
 	imageFinder           *imagefinder.FileSystem
+	layoutWalker          *layoutwalker.FileSystem
 	tagLister             *taglister.FileSystem
 	tagWalker             *tagwalker.FileSystem
 	tagManifestFetcher    *tagmanifestfetcher.FileSystem
