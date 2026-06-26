@@ -3,7 +3,6 @@ package integration
 import (
 	"crypto/sha256"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,13 +15,6 @@ import (
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 	"github.com/scality/static-oci-registry/test/utils"
 )
-
-func readOnDiskManifest(re *utils.RegistryEntry) []byte {
-	bytes, err := os.ReadFile(filepath.Join(re.FullPath(suite.FsRoot), "manifest.json"))
-	Expect(err).NotTo(HaveOccurred())
-
-	return bytes
-}
 
 func sha256Digest(bytes []byte) domain.Digest {
 	h := sha256.Sum256(bytes)
@@ -74,15 +66,14 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 				Image:    image,
 				Tag:      tag,
 			}
-			suite.FetchImage(re)
+			suite.BuildImage(re)
 
-			wantBytes = readOnDiskManifest(re)
-			wantDigest = sha256Digest(wantBytes)
-
-			// derive media type from the manifest we just wrote
-			var m domain.Manifest
-			Expect(json.Unmarshal(wantBytes, &m)).To(Succeed())
-			mediaType = m.MediaType
+			// For a multi-arch image, GET /manifests/<tag> returns the index.
+			// wantBytes/wantDigest/mediaType are sourced from the index.json entry.
+			desc := onDiskTagDescriptor(re, tag)
+			wantBytes = onDiskBlob(re, desc.Digest)
+			wantDigest = desc.Digest
+			mediaType = desc.MediaType
 		})
 
 		AfterAll(func() {
@@ -291,37 +282,23 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 				Image:    "docker.io/library/alpine",
 				Tag:      "3.22.2",
 			}
-			suite.FetchImage(re)
+			suite.BuildImage(re)
 		})
 
 		AfterEach(func() {
 			suite.ClearImage(re)
 		})
 
-		When("the manifest file is unreadable", func() {
+		When("the index.json is unreadable", func() {
 			It("should soft-fail and return 404 MANIFEST_UNKNOWN", func() {
 				if os.Geteuid() == 0 {
 					Skip("permission-based test skipped when running as root")
 				}
 
-				manifestFile := filepath.Join(re.FullPath(suite.FsRoot), "manifest.json")
-				Expect(os.Chmod(manifestFile, utils.PermissionNone)).To(Succeed())
+				indexFile := filepath.Join(re.ImagePath(suite.FsRoot), "index.json")
+				Expect(os.Chmod(indexFile, utils.PermissionNone)).To(Succeed())
 
-				defer func() { _ = os.Chmod(manifestFile, utils.PermissionOK) }()
-
-				req := initRequest(string(re.Image), "/manifests/"+re.Tag, nil)
-
-				resp, body := execRequest(client, req)
-
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-				Expect(string(body)).To(ContainSubstring("MANIFEST_UNKNOWN"))
-			})
-		})
-
-		When("the manifest file contains invalid JSON", func() {
-			It("should soft-fail and return 404 MANIFEST_UNKNOWN", func() {
-				manifestFile := filepath.Join(re.FullPath(suite.FsRoot), "manifest.json")
-				Expect(os.WriteFile(manifestFile, []byte("not json at all"), 0o600)).To(Succeed())
+				defer func() { _ = os.Chmod(indexFile, utils.PermissionOK) }()
 
 				req := initRequest(string(re.Image), "/manifests/"+re.Tag, nil)
 
@@ -332,11 +309,25 @@ var _ = Describe("Fetch Manifest Integration", Ordered, func() {
 			})
 		})
 
-		When("the manifest fails schema validation", func() {
+		When("the index.json contains invalid JSON", func() {
 			It("should soft-fail and return 404 MANIFEST_UNKNOWN", func() {
-				manifestFile := filepath.Join(re.FullPath(suite.FsRoot), "manifest.json")
-				// schemaVersion 1 is invalid (must be 2 per domain.Manifest.Validate)
-				Expect(os.WriteFile(manifestFile, []byte(`{"schemaVersion":1}`), 0o600)).To(Succeed())
+				indexFile := filepath.Join(re.ImagePath(suite.FsRoot), "index.json")
+				Expect(os.WriteFile(indexFile, []byte("not json at all"), 0o600)).To(Succeed())
+
+				req := initRequest(string(re.Image), "/manifests/"+re.Tag, nil)
+
+				resp, body := execRequest(client, req)
+
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				Expect(string(body)).To(ContainSubstring("MANIFEST_UNKNOWN"))
+			})
+		})
+
+		When("the index.json fails schema validation", func() {
+			It("should soft-fail and return 404 MANIFEST_UNKNOWN", func() {
+				indexFile := filepath.Join(re.ImagePath(suite.FsRoot), "index.json")
+				// schemaVersion 1 + missing required mediaType is invalid
+				Expect(os.WriteFile(indexFile, []byte(`{"schemaVersion":1}`), 0o600)).To(Succeed())
 
 				req := initRequest(string(re.Image), "/manifests/"+re.Tag, nil)
 
