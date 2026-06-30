@@ -48,12 +48,6 @@ type (
 		Version  string
 	}
 
-	TagEntry struct {
-		SolutionVersion
-		Name ImageName
-		Tag  Tag
-	}
-
 	ImageName string
 	Tag       string
 	Digest    string

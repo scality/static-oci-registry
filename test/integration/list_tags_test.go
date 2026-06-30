@@ -52,7 +52,7 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 
 		BeforeAll(func() {
 			for _, tag := range tags {
-				suite.FetchImage(&utils.RegistryEntry{
+				suite.BuildImage(&utils.RegistryEntry{
 					Solution: solution,
 					Version:  "v1.0.0",
 					Image:    image,
@@ -243,23 +243,30 @@ var _ = Describe("List Tags Integration", Ordered, func() {
 		})
 
 		When("the image directory has bad permissions", func() {
-			It("should soft-fail and return 200 with an empty tag list", func() {
-				suite.FetchImage(re)
+			It("should return 404 NAME_UNKNOWN (OCI layout skipped, not recognized as a layout)", func() {
+				suite.BuildImage(re)
 
+				// With OCI Image Layout, the server uses os.Root.Stat to check for
+				// index.json / oci-layout markers inside the image directory. os.Root
+				// uses openat-based syscalls that require at least execute permission on
+				// the directory; no-read (0o300) makes those stat calls fail, so the
+				// candidate is not recognized as a valid layout and is skipped entirely.
+				// Result: NAME_UNKNOWN (404) rather than the 200+empty-tags that the
+				// old dir-format returned when it could find the dir but not list it.
 				os.Chmod(re.ImagePath(suite.FsRoot), utils.PermissionNoRead)
 
 				req := initRequest(string(re.Image), "/tags/list", nil)
 
 				resp, body := execRequest(client, req)
 
-				Expect(resp.StatusCode).To(Equal(http.StatusOK))
-				Expect(string(body)).To(ContainSubstring(`"tags":null`))
+				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				checkErrorResponse(body, ocierrors.NameUnknown)
 			})
 		})
 
 		When("the image directory is not readable", func() {
 			It("should soft-fail and still return the healthy tags", func() {
-				suite.FetchImage(re)
+				suite.BuildImage(re)
 
 				// copy the struct by dereferencing the pointer so we don't change the original
 				rebad := *re

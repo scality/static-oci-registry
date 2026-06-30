@@ -11,6 +11,7 @@ import (
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
+	"github.com/scality/static-oci-registry/pkg/service"
 
 	"github.com/hashicorp/go-version"
 )
@@ -19,6 +20,8 @@ type FileSystem struct {
 	logger *slog.Logger
 	root   *os.Root
 }
+
+var _ service.ImageFinder = (*FileSystem)(nil)
 
 func NewFileSystem(
 	logger *slog.Logger,
@@ -143,6 +146,11 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 				continue
 			}
 
+			base := solution.Name() + "/" + candidate.Name() + "/" + string(imageName)
+			if !fs.isLayout(ctx, l, base) {
+				continue
+			}
+
 			found[solution.Name()] = append(found[solution.Name()], domain.SolutionVersion{
 				Solution: solution.Name(),
 				Version:  candidate.Name(),
@@ -182,4 +190,35 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 	}
 
 	return sorted, nil
+}
+
+// isLayout reports whether base is an OCI Image Layout (has both oci-layout
+// and index.json as files). A directory with neither marker is simply not an
+// image and is skipped quietly; a directory with only one marker is a
+// malformed layout and is flagged.
+func (fs *FileSystem) isLayout(ctx context.Context, l *slog.Logger, base string) bool {
+	markers := []string{"oci-layout", "index.json"}
+
+	present := 0
+
+	for _, marker := range markers {
+		if info, err := fs.root.Stat(base + "/" + marker); err == nil && !info.IsDir() {
+			present++
+		}
+	}
+
+	switch present {
+	case len(markers):
+		return true
+	case 0:
+		l.DebugContext(ctx, "directory is not an OCI layout, skipping",
+			slog.String("path", base))
+
+		return false
+	default:
+		l.WarnContext(ctx, "directory looks like a malformed OCI layout, skipping",
+			slog.String("path", base))
+
+		return false
+	}
 }

@@ -5,24 +5,25 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/digestmanifestfetcher"
-	"github.com/scality/static-oci-registry/pkg/infrastructure/tagwalker"
+	"github.com/scality/static-oci-registry/pkg/service/mocks"
 	"github.com/scality/static-oci-registry/test/utils"
+	mock "github.com/stretchr/testify/mock"
 )
 
-var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
+var _ = Describe("Fetch Manifest From Digest", func() {
 	var (
-		mockWalker *tagwalker.Mock
+		mockWalker *mocks.MockLayoutWalker
 		fetcher    *digestmanifestfetcher.FileSystem
 		image      domain.ImageName
 	)
 
-	BeforeAll(func() {
+	BeforeEach(func() {
 		image = "docker.io/library/alpine"
-
-		mockWalker = tagwalker.NewMock()
+		mockWalker = mocks.NewMockLayoutWalker(GinkgoT())
 
 		var err error
 
@@ -30,157 +31,152 @@ var _ = Describe("Fetch Manifest From Digest", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		mockWalker.Reset()
-	})
-
-	entry := func(sol, ver, tag string) domain.TagEntry {
-		return domain.TagEntry{
-			SolutionVersion: domain.SolutionVersion{Solution: sol, Version: ver},
-			Name:            image,
-			Tag:             domain.Tag(tag),
-		}
-	}
-
 	Context("Happy paths", func() {
-		When("a walker entry's manifest hashes to the requested digest", func() {
-			It("returns the manifest with the requested digest echoed back", func() {
-				bytes := []byte(validManifestJSON)
-				wantDigest := sha256Digest(bytes)
+		When("a reachable digest is in the first candidate layout", func() {
+			It("returns the manifest output from that layout", func() {
+				dgst := sha256Digest([]byte(validManifestJSON))
 
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), bytes)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageManifest,
+					ContentDigest: dgst,
+					ManifestBytes: []byte(validManifestJSON),
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
-				out, err := fetcher.FetchManifest(context.Background(), image, wantDigest)
+				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(out).NotTo(BeNil())
-				Expect(out.MediaType).To(Equal("application/vnd.oci.image.manifest.v1+json"))
-				Expect(out.ContentDigest).To(Equal(wantDigest))
-				Expect(out.ManifestBytes).To(BeEquivalentTo(bytes))
+				Expect(out.MediaType).To(Equal(domain.MediaTypeOCIImageManifest))
+				Expect(out.ContentDigest).To(Equal(dgst))
+				Expect(out.ManifestBytes).To(BeEquivalentTo([]byte(validManifestJSON)))
 			})
 		})
 
-		When("only one of several entries matches the digest", func() {
-			It("returns that entry's manifest", func() {
-				targetBytes := []byte(validManifestJSON)
-				otherBytes := []byte(`{` +
-					`"schemaVersion":2,` +
-					`"mediaType":"application/vnd.oci.image.manifest.v1+json",` +
-					`"config":{"mediaType":"x","digest":"sha256:` +
-					`1111111111111111111111111111111111111111111111111111111111111111","size":1},` +
-					`"layers":[]` +
-					`}`)
-				wantDigest := sha256Digest(targetBytes)
+		When("the digest resolves to a multi-arch index", func() {
+			It("returns the index output unchanged", func() {
+				indexBytes := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}`)
+				dgst := sha256Digest(indexBytes)
 
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "other"), otherBytes)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), targetBytes)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageIndex,
+					ContentDigest: dgst,
+					ManifestBytes: indexBytes,
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
-				out, err := fetcher.FetchManifest(context.Background(), image, wantDigest)
+				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(out.ManifestBytes).To(BeEquivalentTo(targetBytes))
+				Expect(out).NotTo(BeNil())
+				Expect(out.MediaType).To(Equal(domain.MediaTypeOCIImageIndex))
+				Expect(out.ContentDigest).To(Equal(dgst))
+				Expect(out.ManifestBytes).To(BeEquivalentTo(indexBytes))
 			})
 		})
 
-		When("a walker entry's manifest hashes to the requested sha512 digest", func() {
-			It("returns the manifest with the requested digest echoed back", func() {
-				bytes := []byte(validManifestJSON)
-				wantDigest := sha512Digest(bytes)
+		When("the first layout lacks the digest but the second has it", func() {
+			It("returns the output from the second layout", func() {
+				dgst := sha256Digest([]byte(validManifestJSON))
 
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), bytes)
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, nil)
 
-				out, err := fetcher.FetchManifest(context.Background(), image, wantDigest)
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageManifest,
+					ContentDigest: dgst,
+					ManifestBytes: []byte(validManifestJSON),
+				}, nil)
+
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
+
+				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(out.ContentDigest).To(Equal(wantDigest))
-				Expect(out.ManifestBytes).To(Equal(bytes))
+				Expect(out).NotTo(BeNil())
+				Expect(out.ContentDigest).To(Equal(dgst))
 			})
 		})
 	})
 
 	Context("Not found cases", func() {
-		When("the walker yields no entries", func() {
-			It("returns ErrManifestNotFound", func() {
+		When("the digest is not reachable in any layout", func() {
+			It("returns MANIFEST_UNKNOWN wrapping ErrManifestNotFound", func() {
+				dgst := sha256Digest([]byte("nothing"))
+
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
+
+				_, err := fetcher.FetchManifest(context.Background(), image, dgst)
+				Expect(err).To(HaveOccurred())
+				utils.ValidateError(err)
+				Expect(errors.Is(err, domain.ErrManifestNotFound)).To(BeTrue())
+			})
+		})
+
+		When("the walker yields no layouts at all", func() {
+			It("returns MANIFEST_UNKNOWN wrapping ErrManifestNotFound", func() {
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq())
+
 				_, err := fetcher.FetchManifest(context.Background(), image, sha256Digest([]byte("nothing")))
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
+				Expect(errors.Is(err, domain.ErrManifestNotFound)).To(BeTrue())
 			})
 		})
 
-		When("no entry's manifest matches the requested digest", func() {
-			It("returns ErrManifestNotFound", func() {
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte(validManifestJSON))
+		When("an unsupported algorithm digest is requested (not in any layout's index)", func() {
+			It("returns MANIFEST_UNKNOWN without special-casing the algorithm", func() {
+				// sha512 digest not registered in any layout -- naturally returns not found.
+				dgst := sha512Digest([]byte(validManifestJSON))
 
-				wrongDigest := sha256Digest([]byte("something completely different"))
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
-				_, err := fetcher.FetchManifest(context.Background(), image, wrongDigest)
+				_, err := fetcher.FetchManifest(context.Background(), image, dgst)
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
-			})
-		})
-
-		When("the requested digest uses an unsupported algorithm", func() {
-			It("returns ErrManifestNotFound without walking", func() {
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte(validManifestJSON))
-				// sha384 is grammar-valid but unsupported by the fetcher.
-				unsupported := domain.Digest("sha384:" +
-					"000000000000000000000000000000000000000000000000" +
-					"000000000000000000000000000000000000000000000000")
-
-				_, err := fetcher.FetchManifest(context.Background(), image, unsupported)
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
+				Expect(errors.Is(err, domain.ErrManifestNotFound)).To(BeTrue())
 			})
 		})
 	})
 
 	Context("Error propagation", func() {
-		When("the walker yields an error", func() {
-			It("propagates the wrapped error", func() {
-				mockWalker.SetWalkError(errors.Wrap(domain.ErrRegistryInternal))
+		When("the walker itself yields an error", func() {
+			It("propagates the wrapped error and aborts", func() {
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(errSeq(errors.Wrap(domain.ErrRegistryInternal)))
 
 				_, err := fetcher.FetchManifest(context.Background(), image,
 					sha256Digest([]byte(validManifestJSON)))
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+				Expect(errors.Is(err, domain.ErrRegistryInternal)).To(BeTrue())
 			})
 		})
 
-		When("ReadManifestBytes fails", func() {
-			It("skips the entry and returns ManifestNotFound", func() {
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte(validManifestJSON))
-				mockWalker.SetReadError(errors.Wrap(domain.ErrRegistryInternal))
+		When("a layout's ReadManifestByDigest returns an error", func() {
+			It("skips that layout and returns the result from the next one", func() {
+				dgst := sha256Digest([]byte(validManifestJSON))
 
-				_, err := fetcher.FetchManifest(context.Background(), image,
-					sha256Digest([]byte(validManifestJSON)))
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
-			})
-		})
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
+				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
 
-		When("the manifest bytes are not valid JSON", func() {
-			It("skips the entry and returns ManifestNotFound", func() {
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte("not json"))
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageManifest,
+					ContentDigest: dgst,
+					ManifestBytes: []byte(validManifestJSON),
+				}, nil)
 
-				_, err := fetcher.FetchManifest(context.Background(), image,
-					sha256Digest([]byte("not json")))
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
-			})
-		})
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
-		When("the manifest fails domain validation", func() {
-			It("skips the entry and returns ManifestNotFound", func() {
-				badBytes := []byte(`{"schemaVersion":1}`)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), badBytes)
-
-				_, err := fetcher.FetchManifest(context.Background(), image, sha256Digest(badBytes))
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
+				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(out).NotTo(BeNil())
+				Expect(out.ContentDigest).To(Equal(dgst))
 			})
 		})
 	})

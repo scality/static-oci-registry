@@ -2,54 +2,30 @@ package unit
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/sha512"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/tagmanifestfetcher"
-	"github.com/scality/static-oci-registry/pkg/infrastructure/tagwalker"
+	"github.com/scality/static-oci-registry/pkg/service/mocks"
 	"github.com/scality/static-oci-registry/test/utils"
+	mock "github.com/stretchr/testify/mock"
 )
 
-// validManifestJSON is a minimally-valid OCI image manifest per domain.Manifest.Validate().
-// SchemaVersion=2, non-empty MediaType, Config with valid MediaType + digest.
-const validManifestJSON = `{` +
-	`"schemaVersion":2,` +
-	`"mediaType":"application/vnd.oci.image.manifest.v1+json",` +
-	`"config":{` +
-	`"mediaType":"application/vnd.oci.image.config.v1+json",` +
-	`"digest":"sha256:` +
-	`0000000000000000000000000000000000000000000000000000000000000000",` +
-	`"size":7023` +
-	`},` +
-	`"layers":[]` +
-	`}`
-
-func sha256Digest(bytes []byte) domain.Digest {
-	h := sha256.Sum256(bytes)
-	return domain.Digest(fmt.Sprintf("sha256:%x", h[:]))
-}
-
-func sha512Digest(bytes []byte) domain.Digest {
-	h := sha512.Sum512(bytes)
-	return domain.Digest(fmt.Sprintf("sha512:%x", h[:]))
-}
-
-var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
+var _ = Describe("Fetch Manifest From Tag", func() {
 	var (
-		mockWalker *tagwalker.Mock
+		mockWalker *mocks.MockLayoutWalker
 		fetcher    *tagmanifestfetcher.FileSystem
 		image      domain.ImageName
+		tag        domain.Tag
 	)
 
-	BeforeAll(func() {
+	BeforeEach(func() {
 		image = "docker.io/library/alpine"
-
-		mockWalker = tagwalker.NewMock()
+		tag = "3.22"
+		mockWalker = mocks.NewMockLayoutWalker(GinkgoT())
 
 		var err error
 
@@ -57,119 +33,130 @@ var _ = Describe("Fetch Manifest From Tag", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		mockWalker.Reset()
-	})
-
-	entry := func(sol, ver, tag string) domain.TagEntry {
-		return domain.TagEntry{
-			SolutionVersion: domain.SolutionVersion{Solution: sol, Version: ver},
-			Name:            image,
-			Tag:             domain.Tag(tag),
-		}
-	}
+	someDigest := domain.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	manifestBytes := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json"}`)
 
 	Context("Happy paths", func() {
-		When("the walker yields a matching tag with a valid manifest", func() {
-			It("returns the manifest with correct digest and media type", func() {
-				bytes := []byte(validManifestJSON)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), bytes)
+		When("a layout resolves the tag on the first candidate", func() {
+			It("returns the output from that layout", func() {
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageManifest,
+					ContentDigest: someDigest,
+					ManifestBytes: manifestBytes,
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
-				out, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
+				out, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(out).NotTo(BeNil())
-				Expect(out.MediaType).To(Equal("application/vnd.oci.image.manifest.v1+json"))
-				Expect(out.ContentDigest).To(Equal(sha256Digest(bytes)))
-				Expect(out.ManifestBytes).To(BeEquivalentTo(bytes))
+				Expect(out.MediaType).To(Equal(domain.MediaTypeOCIImageManifest))
+				Expect(out.ContentDigest).To(Equal(someDigest))
+				Expect(out.ManifestBytes).To(BeEquivalentTo(manifestBytes))
 			})
 		})
 
-		When("the walker yields multiple tags including the target", func() {
-			It("returns the matching tag's manifest", func() {
-				targetBytes := []byte(validManifestJSON)
-				otherBytes := []byte(`{"schemaVersion":2,"mediaType":"x","config":{"mediaType":"x","digest":"sha256:` +
-					`1111111111111111111111111111111111111111111111111111111111111111","size":1}}`)
+		When("the first layout lacks the tag but the second has it", func() {
+			It("returns the output from the second layout", func() {
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(nil, nil)
 
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "other"), otherBytes)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), targetBytes)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "latest"), otherBytes)
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageManifest,
+					ContentDigest: someDigest,
+					ManifestBytes: manifestBytes,
+				}, nil)
 
-				out, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
+
+				out, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(out.ManifestBytes).To(BeEquivalentTo(targetBytes))
-				Expect(out.ContentDigest).To(Equal(sha256Digest(targetBytes)))
+				Expect(out).NotTo(BeNil())
+				Expect(out.ContentDigest).To(Equal(someDigest))
+			})
+		})
+
+		When("a layout returns a multi-arch index for the tag", func() {
+			It("passes the index output through unchanged", func() {
+				indexDigest := domain.Digest("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+				indexBytes := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}`)
+
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageIndex,
+					ContentDigest: indexDigest,
+					ManifestBytes: indexBytes,
+				}, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
+
+				out, err := fetcher.FetchManifest(context.Background(), image, tag)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(out).NotTo(BeNil())
+				Expect(out.MediaType).To(Equal(domain.MediaTypeOCIImageIndex))
+				Expect(out.ContentDigest).To(Equal(indexDigest))
+				Expect(out.ManifestBytes).To(BeEquivalentTo(indexBytes))
 			})
 		})
 	})
 
 	Context("Not found cases", func() {
-		When("the walker yields no entries", func() {
-			It("returns ErrManifestNotFound", func() {
-				_, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
+		When("no layout has the tag", func() {
+			It("returns MANIFEST_UNKNOWN OCI error wrapping ErrManifestNotFound", func() {
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(nil, nil)
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
+
+				_, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
+				Expect(errors.Is(err, domain.ErrManifestNotFound)).To(BeTrue())
 			})
 		})
 
-		When("the walker yields entries but none match the tag", func() {
-			It("returns ErrManifestNotFound", func() {
-				bytes := []byte(validManifestJSON)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "other"), bytes)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "latest"), bytes)
+		When("the walker yields no layouts at all", func() {
+			It("returns MANIFEST_UNKNOWN OCI error wrapping ErrManifestNotFound", func() {
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq())
 
-				_, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
+				_, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
+				Expect(errors.Is(err, domain.ErrManifestNotFound)).To(BeTrue())
 			})
 		})
 	})
 
 	Context("Error propagation", func() {
-		When("the walker yields an error", func() {
-			It("propagates the wrapped error", func() {
-				mockWalker.SetWalkError(errors.Wrap(domain.ErrRegistryInternal))
+		When("the walker itself yields an error", func() {
+			It("propagates the wrapped error and aborts", func() {
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(errSeq(errors.Wrap(domain.ErrRegistryInternal)))
 
-				_, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
+				_, err := fetcher.FetchManifest(context.Background(), image, tag)
 				Expect(err).To(HaveOccurred())
 				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrRegistryInternal))
+				Expect(errors.Is(err, domain.ErrRegistryInternal)).To(BeTrue())
 			})
 		})
 
-		When("ReadManifestBytes fails on the matching tag", func() {
-			It("skips the entry and returns ManifestNotFound", func() {
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte(validManifestJSON))
-				mockWalker.SetReadError(errors.Wrap(domain.ErrRegistryInternal))
+		When("a layout's ResolveTag returns an error", func() {
+			It("skips that layout and returns the result from the next one", func() {
+				layoutA := mocks.NewMockLayout(GinkgoT())
+				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
+				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
 
-				_, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
-			})
-		})
+				layoutB := mocks.NewMockLayout(GinkgoT())
+				layoutB.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{
+					MediaType:     domain.MediaTypeOCIImageManifest,
+					ContentDigest: someDigest,
+					ManifestBytes: manifestBytes,
+				}, nil)
 
-		When("the manifest bytes are not valid JSON", func() {
-			It("skips the entry and returns ManifestNotFound", func() {
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte("not json"))
+				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
-				_, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
-			})
-		})
-
-		When("the manifest fails domain validation", func() {
-			It("skips the entry and returns ManifestNotFound", func() {
-				// SchemaVersion 1 is invalid (must be 2)
-				mockWalker.AddEntry(entry("sol-a", "v1.0.0", "3.22.2"), []byte(`{"schemaVersion":1}`))
-
-				_, err := fetcher.FetchManifest(context.Background(), image, domain.Tag("3.22.2"))
-				Expect(err).To(HaveOccurred())
-				utils.ValidateError(err)
-				Expect(err).To(MatchError(domain.ErrManifestNotFound))
+				out, err := fetcher.FetchManifest(context.Background(), image, tag)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(out).NotTo(BeNil())
+				Expect(out.ContentDigest).To(Equal(someDigest))
 			})
 		})
 	})

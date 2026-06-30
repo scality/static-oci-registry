@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -16,14 +15,51 @@ import (
 	"github.com/scality/static-oci-registry/test/utils"
 )
 
-// copyTagDir duplicates an existing tag directory under a new tag name in the
-// same image dir, so the same image+tag can exist in multiple solution-versions
-// with different content.
-func copyTagDir(re *utils.RegistryEntry, newTag string) {
-	src := re.FullPath(suite.FsRoot)
-	dst := filepath.Join(re.ImagePath(suite.FsRoot), newTag)
-	// nolint: gosec // G204: this is acceptable since it's for tests only
-	Expect(exec.Command("cp", "-r", src, dst).Run()).To(Succeed())
+// addTagAlias writes a new entry into an OCI Image Layout's index.json that
+// points the given alias tag at the same descriptor as srcTag. This lets the
+// same layout expose a "latest" alias alongside the canonical version tag
+// without re-downloading any blobs.
+func addTagAlias(re *utils.RegistryEntry, srcTag, aliasTag string) {
+	indexPath := filepath.Join(re.ImagePath(suite.FsRoot), "index.json")
+
+	raw, err := os.ReadFile(indexPath)
+	Expect(err).NotTo(HaveOccurred())
+
+	var idx domain.Index
+	Expect(json.Unmarshal(raw, &idx)).To(Succeed())
+
+	// Find the source descriptor.
+	var srcDesc domain.ManifestDescriptor
+
+	found := false
+
+	for _, m := range idx.Manifests {
+		if m.Annotations[domain.RefNameAnnotation] == srcTag {
+			srcDesc = m
+			found = true
+
+			break
+		}
+	}
+
+	Expect(found).To(BeTrue(), "source tag %q not found in index.json", srcTag)
+
+	// Clone the descriptor and update the ref.name annotation to the alias.
+	aliasDesc := srcDesc
+	aliasAnnotations := make(map[string]string, len(srcDesc.Annotations))
+
+	for k, v := range srcDesc.Annotations {
+		aliasAnnotations[k] = v
+	}
+
+	aliasAnnotations[domain.RefNameAnnotation] = aliasTag
+	aliasDesc.Annotations = aliasAnnotations
+
+	idx.Manifests = append(idx.Manifests, aliasDesc)
+
+	out, err := json.Marshal(idx)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(os.WriteFile(indexPath, out, 0o600)).To(Succeed())
 }
 
 var _ = Describe("Multi-version solution: latest tag resolution", Ordered, func() {
@@ -64,26 +100,29 @@ var _ = Describe("Multi-version solution: latest tag resolution", Ordered, func(
 			Tag:      newTag,
 		}
 
-		suite.FetchImage(reOld)
-		suite.FetchImage(reNew)
+		suite.BuildImage(reOld)
+		suite.BuildImage(reNew)
 
-		// Expose both under the same "latest" tag inside each version dir.
-		copyTagDir(reOld, sharedTag)
-		copyTagDir(reNew, sharedTag)
+		// Expose both under the same "latest" tag by aliasing in each layout's index.json.
+		addTagAlias(reOld, oldTag, sharedTag)
+		addTagAlias(reNew, newTag, sharedTag)
 
 		// Expected truth: the newest solution-version (v2.0.0).
-		newManifestBytes = readOnDiskManifest(reNew)
+		// For a multi-arch image, GET /manifests/<tag> returns the index descriptor.
+		newDesc := onDiskTagDescriptor(reNew, sharedTag)
+		newManifestBytes = onDiskBlob(reNew, newDesc.Digest)
+		newManifestType = newDesc.MediaType
 
-		var m domain.Manifest
-		Expect(json.Unmarshal(newManifestBytes, &m)).To(Succeed())
-		newManifestType = m.MediaType
-		Expect(m.Config).NotTo(BeNil())
-		newConfigDigest = m.Config.Digest
-		newConfigBytes = readOnDiskBlob(reNew, newConfigDigest)
+		// Descend one level to find the concrete image manifest for config/layer digests.
+		newImageManifest, _ := onDiskImageManifest(reNew, sharedTag)
+		Expect(newImageManifest.Config).NotTo(BeNil())
+		newConfigDigest = newImageManifest.Config.Digest
+		newConfigBytes = onDiskBlob(reNew, newConfigDigest)
 
 		// Sanity check: the two versions really do have different content,
 		// otherwise this test would pass trivially regardless of ordering.
-		oldManifestBytes := readOnDiskManifest(reOld)
+		oldDesc := onDiskTagDescriptor(reOld, sharedTag)
+		oldManifestBytes := onDiskBlob(reOld, oldDesc.Digest)
 		Expect(oldManifestBytes).NotTo(BeEquivalentTo(newManifestBytes),
 			"fixture bug: old and new manifests must differ for this test to be meaningful")
 	})
@@ -147,12 +186,11 @@ var _ = Describe("Multi-version solution: latest tag resolution", Ordered, func(
 			// old version's config digest is still serveable. This guards
 			// against a regression where ordering changes accidentally
 			// short-circuit the blob-authorization walk.
-			oldManifest := parseOnDiskManifest(reOld)
-			Expect(oldManifest.Config).NotTo(BeNil())
-			oldConfigDigest := oldManifest.Config.Digest
+			oldImageManifest, _ := onDiskImageManifest(reOld, sharedTag)
+			Expect(oldImageManifest.Config).NotTo(BeNil())
+			oldConfigDigest := oldImageManifest.Config.Digest
 
-			// If old and new happened to share the config blob (they shouldn't,
-			// given the VERSION label differs), skip the assertion.
+			// If old and new happened to share the config blob, skip the assertion.
 			if oldConfigDigest == newConfigDigest {
 				Skip("old and new config digests are identical; nothing to compare")
 			}
@@ -167,20 +205,14 @@ var _ = Describe("Multi-version solution: latest tag resolution", Ordered, func(
 	})
 
 	When("verifying the on-disk layout matches the intent", func() {
-		It("has the shared tag in both solution-versions", func() {
-			oldLatest := filepath.Join(reOld.ImagePath(suite.FsRoot), sharedTag, "manifest.json")
-			newLatest := filepath.Join(reNew.ImagePath(suite.FsRoot), sharedTag, "manifest.json")
+		It("has the shared tag in both solution-version index.json files", func() {
+			// Verify addTagAlias worked: both layouts expose sharedTag.
+			oldDesc := onDiskTagDescriptor(reOld, sharedTag)
+			newDesc := onDiskTagDescriptor(reNew, sharedTag)
 
-			Expect(oldLatest).To(BeAnExistingFile())
-			Expect(newLatest).To(BeAnExistingFile())
-
-			oldBytes, err := os.ReadFile(oldLatest)
-			Expect(err).NotTo(HaveOccurred())
-			newBytes, err := os.ReadFile(newLatest)
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(oldBytes).NotTo(BeEquivalentTo(newBytes),
-				"the two shared-tag manifests must differ; otherwise the test cannot detect ordering")
+			// They must point to different digests (different image versions).
+			Expect(oldDesc.Digest).NotTo(Equal(newDesc.Digest),
+				"the two shared-tag descriptors must differ; otherwise the test cannot detect ordering")
 		})
 	})
 })

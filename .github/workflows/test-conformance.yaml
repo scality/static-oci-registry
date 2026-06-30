@@ -15,7 +15,6 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           sparse-checkout: |
-            test/target.Dockerfile
             Makefile
 
       # run make testfs to replicate a testfs
@@ -34,7 +33,7 @@ jobs:
 
       - name: clean unneeded files
         run: |
-          rm -rf Makefile test/target.Dockerfile
+          rm -rf Makefile
 
       - name: Log in to GHCR
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
@@ -71,9 +70,15 @@ jobs:
       # conformance tool to use existing content instead of pushing its own.
       - name: Compute manifest and blob digests for Pull tests
         run: |
-          MANIFEST_PATH=${{ github.workspace }}/fs/my-solution/v4.5.0/docker.io/library/alpine/3.22/manifest.json
-          MANIFEST_DIGEST="sha256:$(sha256sum "$MANIFEST_PATH" | awk '{print $1}')"
-          BLOB_DIGEST=$(jq -r '.config.digest' "$MANIFEST_PATH")
+          LAYOUT=${{ github.workspace }}/fs/my-solution/v4.5.0/docker.io/library/alpine
+          MANIFEST_DIGEST=$(jq -r '.manifests[] | select(.annotations["org.opencontainers.image.ref.name"]=="3.22") | .digest' "$LAYOUT/index.json")
+          MT=$(jq -r '.manifests[] | select(.annotations["org.opencontainers.image.ref.name"]=="3.22") | .mediaType' "$LAYOUT/index.json")
+          BLOB_SRC_DIGEST="$MANIFEST_DIGEST"
+          if echo "$MT" | grep -Eq 'image.index|manifest.list'; then
+            SUB=$(jq -r '.manifests[0].digest' "$LAYOUT/blobs/sha256/${MANIFEST_DIGEST#sha256:}")
+            BLOB_SRC_DIGEST="$SUB"
+          fi
+          BLOB_DIGEST=$(jq -r '.config.digest' "$LAYOUT/blobs/sha256/${BLOB_SRC_DIGEST#sha256:}")
           echo "OCI_MANIFEST_DIGEST=$MANIFEST_DIGEST" >> "$GITHUB_ENV"
           echo "OCI_BLOB_DIGEST=$BLOB_DIGEST" >> "$GITHUB_ENV"
 

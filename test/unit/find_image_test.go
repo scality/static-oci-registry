@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -11,6 +12,17 @@ import (
 
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 )
+
+// makeLayoutDir turns <root>/<sol>/<ver>/<image> into a minimal OCI layout
+// (empty index.json is enough for the finder predicate).
+func makeLayoutDir(root, sol, ver, image string) {
+	dir := filepath.Join(root, sol, ver, image)
+	Expect(os.MkdirAll(filepath.Join(dir, "blobs", "sha256"), utils.PermissionOK)).To(Succeed())
+	Expect(os.WriteFile(filepath.Join(dir, "oci-layout"),
+		[]byte(`{"imageLayoutVersion":"1.0.0"}`), 0o600)).To(Succeed())
+	Expect(os.WriteFile(filepath.Join(dir, "index.json"),
+		[]byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}`), 0o600)).To(Succeed())
+}
 
 var _ = Describe("Find Images", Ordered, func() {
 	var (
@@ -35,7 +47,7 @@ var _ = Describe("Find Images", Ordered, func() {
 	Context("Finding images in a healthy FS", func() {
 		When("using an existing image", func() {
 			It("should return the correct solution versions", func() {
-				suite.FetchImage(re)
+				makeLayoutDir(suite.FsRoot, re.Solution, re.Version, string(re.Image))
 
 				found, err := imageFinder.FindImage(context.Background(), re.Image)
 
@@ -46,7 +58,7 @@ var _ = Describe("Find Images", Ordered, func() {
 
 		When("using a non existant image", func() {
 			It("should return a not found error", func() {
-				suite.FetchImage(re)
+				makeLayoutDir(suite.FsRoot, re.Solution, re.Version, string(re.Image))
 
 				_, err := imageFinder.FindImage(context.Background(), "ghcr.io/nonexistent/image")
 
@@ -60,7 +72,7 @@ var _ = Describe("Find Images", Ordered, func() {
 	Context("Finding images in a corrupted FS", func() {
 		When("an image directory is not readable", func() {
 			It("should skip the bad candidate and still return the healthy ones", func() {
-				suite.FetchImage(re)
+				makeLayoutDir(suite.FsRoot, re.Solution, re.Version, string(re.Image))
 
 				// copy the struct by dereferencing the pointer so we don't change the original
 				rebad := *re
@@ -130,9 +142,8 @@ var _ = Describe("Find Images ordering (round-robin, newest version first)", Ord
 
 	BeforeAll(func() {
 		for solution, versions := range layout {
-			for _, version := range versions {
-				path := suite.FsRoot + "/" + solution + "/" + version + "/" + string(image)
-				Expect(os.MkdirAll(path, utils.PermissionOK)).To(Succeed())
+			for _, ver := range versions {
+				makeLayoutDir(suite.FsRoot, solution, ver, string(image))
 			}
 		}
 
@@ -161,5 +172,35 @@ var _ = Describe("Find Images ordering (round-robin, newest version first)", Ord
 			{Solution: "rr-sol-c", Version: "v1.0.0"},
 			{Solution: "rr-sol-a", Version: "v1.0.0"},
 		}))
+	})
+})
+
+var _ = Describe("Find Images OCI layout predicate", Ordered, func() {
+	var (
+		imageFinder *imagefinder.FileSystem
+		ctx         = context.Background()
+	)
+
+	BeforeAll(func() {
+		var err error
+
+		imageFinder, err = imagefinder.NewFileSystem(suite.Logger, openRoot(suite.FsRoot))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(os.RemoveAll(filepath.Join(suite.FsRoot, "sol"))).To(Succeed())
+	})
+
+	When("an image directory is missing oci-layout/index.json", func() {
+		It("is not treated as an image", func() {
+			// create the dir but NOT the layout marker files
+			Expect(os.MkdirAll(filepath.Join(suite.FsRoot, "sol", "1.0.0", "img"), utils.PermissionOK)).To(Succeed())
+
+			_, err := imageFinder.FindImage(ctx, domain.ImageName("img"))
+
+			utils.ValidateError(err)
+			Expect(err).To(MatchError(domain.ErrImageNotFound))
+		})
 	})
 })

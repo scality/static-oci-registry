@@ -2,7 +2,6 @@ package integration
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -17,17 +16,6 @@ import (
 	"github.com/scality/static-oci-registry/test/utils"
 )
 
-// parseOnDiskManifest unmarshals the manifest.json written by skopeo so the
-// tests can pick real digests dynamically instead of hardcoding them.
-func parseOnDiskManifest(re *utils.RegistryEntry) domain.Manifest {
-	bytes := readOnDiskManifest(re)
-
-	var m domain.Manifest
-	Expect(json.Unmarshal(bytes, &m)).To(Succeed())
-
-	return m
-}
-
 // digestEncoded extracts the encoded portion of a digest. Tests construct
 // digests from known-valid bytes (the on-disk manifest or hardcoded
 // sha256/sha512 literals), so an error here is a fixture bug.
@@ -36,15 +24,6 @@ func digestEncoded(d domain.Digest) string {
 	Expect(err).NotTo(HaveOccurred())
 
 	return enc
-}
-
-// readOnDiskBlob reads the content-addressed blob file from the tag dir for
-// byte-for-byte comparison against the HTTP response body.
-func readOnDiskBlob(re *utils.RegistryEntry, dgst domain.Digest) []byte {
-	bytes, err := os.ReadFile(filepath.Join(re.FullPath(suite.FsRoot), digestEncoded(dgst)))
-	Expect(err).NotTo(HaveOccurred())
-
-	return bytes
 }
 
 // checkBlobResponse asserts the registry returned the blob verbatim with
@@ -94,17 +73,19 @@ var _ = Describe("Pull Blob Integration", Ordered, func() {
 				Image:    image,
 				Tag:      tag,
 			}
-			suite.FetchImage(re)
+			suite.BuildImage(re)
 
-			m := parseOnDiskManifest(re)
+			// onDiskImageManifest descends into the image index (alpine is multi-arch)
+			// and returns a concrete platform manifest + its digest.
+			m, _ := onDiskImageManifest(re, tag)
 			Expect(m.Config).NotTo(BeNil())
 			Expect(m.Layers).NotTo(BeEmpty(),
 				"test image must have at least one layer for the layer-blob spec")
 
 			configDigest = m.Config.Digest
 			layerDigest = m.Layers[0].Digest
-			wantConfigBytes = readOnDiskBlob(re, configDigest)
-			wantLayerBytes = readOnDiskBlob(re, layerDigest)
+			wantConfigBytes = onDiskBlob(re, configDigest)
+			wantLayerBytes = onDiskBlob(re, layerDigest)
 		})
 
 		AfterAll(func() {
@@ -247,14 +228,15 @@ var _ = Describe("Pull Blob Integration", Ordered, func() {
 		})
 
 		Context("Security: manifest-authorized blob serving", func() {
-			When("a file is present in the tag dir but not referenced by the manifest", func() {
+			When("a file is present in the blobs dir but not referenced by any manifest", func() {
 				It("should return BLOB_UNKNOWN and never serve the file contents", func() {
-					// Pick a sha256 that is grammar-valid but not in the manifest,
-					// then drop a file at <tag>/<encoded> with marker contents.
+					// Pick a sha256 that is grammar-valid but not in any manifest,
+					// then drop a file at blobs/sha256/<encoded> with marker contents.
 					strayDigest := domain.Digest(
 						"sha256:dead000000000000000000000000000000000000000000000000000000000000",
 					)
-					strayPath := filepath.Join(re.FullPath(suite.FsRoot), digestEncoded(strayDigest))
+					enc := digestEncoded(strayDigest)
+					strayPath := filepath.Join(re.ImagePath(suite.FsRoot), "blobs", "sha256", enc)
 					strayContents := []byte("THIS-MUST-NEVER-BE-SERVED")
 					Expect(os.WriteFile(strayPath, strayContents, 0o600)).To(Succeed())
 
@@ -319,9 +301,9 @@ var _ = Describe("Pull Blob Integration", Ordered, func() {
 				Image:    "docker.io/library/alpine",
 				Tag:      "3.22.2",
 			}
-			suite.FetchImage(re)
+			suite.BuildImage(re)
 
-			m := parseOnDiskManifest(re)
+			m, _ := onDiskImageManifest(re, re.Tag)
 			Expect(m.Config).NotTo(BeNil())
 			configDigest = m.Config.Digest
 		})
@@ -336,7 +318,7 @@ var _ = Describe("Pull Blob Integration", Ordered, func() {
 					Skip("permission-based test skipped when running as root")
 				}
 
-				blobFile := filepath.Join(re.FullPath(suite.FsRoot), digestEncoded(configDigest))
+				blobFile := filepath.Join(re.ImagePath(suite.FsRoot), "blobs", "sha256", digestEncoded(configDigest))
 				Expect(os.Chmod(blobFile, utils.PermissionNone)).To(Succeed())
 
 				defer func() { _ = os.Chmod(blobFile, utils.PermissionOK) }()
@@ -352,7 +334,7 @@ var _ = Describe("Pull Blob Integration", Ordered, func() {
 
 		When("a manifest references a blob that is missing on disk", func() {
 			It("should return 404 BLOB_UNKNOWN", func() {
-				blobFile := filepath.Join(re.FullPath(suite.FsRoot), digestEncoded(configDigest))
+				blobFile := filepath.Join(re.ImagePath(suite.FsRoot), "blobs", "sha256", digestEncoded(configDigest))
 				Expect(os.Remove(blobFile)).To(Succeed())
 
 				req := initRequest(string(re.Image), "/blobs/"+string(configDigest), nil)
@@ -364,16 +346,16 @@ var _ = Describe("Pull Blob Integration", Ordered, func() {
 			})
 		})
 
-		When("the manifest file is unreadable (authorization gate fails)", func() {
+		When("the index.json is unreadable (authorization gate fails)", func() {
 			It("should return 404 BLOB_UNKNOWN", func() {
 				if os.Geteuid() == 0 {
 					Skip("permission-based test skipped when running as root")
 				}
 
-				manifestFile := filepath.Join(re.FullPath(suite.FsRoot), "manifest.json")
-				Expect(os.Chmod(manifestFile, utils.PermissionNone)).To(Succeed())
+				indexFile := filepath.Join(re.ImagePath(suite.FsRoot), "index.json")
+				Expect(os.Chmod(indexFile, utils.PermissionNone)).To(Succeed())
 
-				defer func() { _ = os.Chmod(manifestFile, utils.PermissionOK) }()
+				defer func() { _ = os.Chmod(indexFile, utils.PermissionOK) }()
 
 				req := initRequest(string(re.Image), "/blobs/"+string(configDigest), nil)
 

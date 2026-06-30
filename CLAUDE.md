@@ -2,8 +2,9 @@
 
 This is a **Go implementation of a read-only OCI container registry** serving the
 [OCI distribution spec](https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md)
-Pull and Discovery use cases. Images are read from a filesystem hierarchy
-(`<solutions>/<solution>/<version>/`) and served over mandatory TLS.
+Pull and Discovery use cases. Images are stored as [OCI Image Layouts](https://github.com/opencontainers/image-spec/blob/main/image-layout.md)
+under a filesystem hierarchy (`<solutions>/<solution>/<version>/<image>/`) and served over
+mandatory TLS. Multi-arch images (image indexes) are supported.
 
 It contains:
 

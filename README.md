@@ -48,13 +48,33 @@ without `ns` are unaffected.
 
 Blob responses stream the content from disk and support `Range` requests
 (`206 Partial Content`, `416 Requested Range Not Satisfiable`). A blob is only
-served if its `<digest>` is referenced by the manifest of at least one tag
-under `<name>` (as `config.digest`, a `layers[].digest`, or `subject.digest`);
-stray files in the tag directory are never exposed.
+served if its `<digest>` is referenced (as `config.digest`, a `layers[].digest`,
+or `subject.digest`) by a manifest reachable from the image's `index.json` -
+directly, or via an image index for multi-arch images. Stray files in the layout
+are never exposed.
 
 When pulling a blob, the `Docker-Content-Digest` response header echoes the digest from the request URL;
 the registry trusts the on-disk layout and does not re-hash blobs on the fly, which
 also avoids the cost of streaming every byte through a hash function on each pull.
+
+## On-disk format
+
+Each image is stored as an [OCI Image Layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md)
+under `<solutions>/<solution>/<version>/<image>/`: an `oci-layout` marker, an `index.json`
+whose entries carry tags via the `org.opencontainers.image.ref.name` annotation, and a
+shared `blobs/<algorithm>/<digest>` store.
+
+Multi-architecture images are supported. A multi-arch tag resolves to an image index, which
+is what `GET /v2/<name>/manifests/<tag>` returns; the client then selects a platform and
+fetches the per-platform manifest by digest. The registry never inspects platforms itself -
+it serves the index, any manifest reachable from it by digest, and the blobs those manifests
+reference.
+
+Images can be produced with
+`skopeo copy --all docker://<ref> oci:<solutions>/<solution>/<version>/<image>:<tag>`
+(repeated tags accumulate into one layout with shared blobs). The on-disk hierarchy may be
+modified while the server runs - solutions, versions, images and tags are read on demand on
+each request, so additions and removals take effect without a restart.
 
 ## Environment variables
 

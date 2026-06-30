@@ -37,10 +37,6 @@ type (
 	QueryParams map[string]string
 )
 
-func (re *RegistryEntry) FullPath(root string) string {
-	return re.ImagePath(root) + "/" + re.Tag
-}
-
 func (re *RegistryEntry) ImagePath(root string) string {
 	return root + "/" + re.Solution + "/" + re.Version + "/" + string(re.Image)
 }
@@ -108,10 +104,32 @@ func (s *TestSuite) InitLogger() {
 }
 
 func (s *TestSuite) FetchImage(re *RegistryEntry) {
-	// create dirs and files as needed
 	Expect(os.MkdirAll(re.ImagePath(s.FsRoot), PermissionOK)).To(Succeed())
 
-	// get DOCKER_HOST env var, or use default if not set
+	// skopeo copy --all (multi-arch) from a public registry into a shared OCI
+	// Image Layout; the tag becomes the index.json ref.name annotation. Repeated
+	// calls with the same ImagePath accumulate tags into one layout (shared blobs).
+	// nolint: gosec // G204: test-only
+	cmd := exec.Command(
+		"skopeo", "copy",
+		"--all",
+		"--insecure-policy",
+		"docker://"+string(re.Image)+":"+re.Tag,
+		"oci:"+re.ImagePath(s.FsRoot)+":"+re.Tag,
+	)
+
+	out, err := cmd.CombinedOutput()
+	Expect(err).NotTo(HaveOccurred(), "skopeo copy failed: %s", string(out))
+}
+
+// BuildImage builds a controlled, single-architecture image locally from the
+// test Dockerfile (TARGET_DOCKERFILE) and converts it into an OCI Image Layout.
+// Unlike FetchImage it does not depend on any public registry, so it is
+// deterministic and free of Docker Hub rate limits; use it for the core flows
+// and FetchImage for real multi-arch coverage.
+func (s *TestSuite) BuildImage(re *RegistryEntry) {
+	Expect(os.MkdirAll(re.ImagePath(s.FsRoot), PermissionOK)).To(Succeed())
+
 	dockerHost := os.Getenv("DOCKER_HOST")
 	if dockerHost == "" {
 		dockerHost = "unix:///var/run/docker.sock"
@@ -119,10 +137,8 @@ func (s *TestSuite) FetchImage(re *RegistryEntry) {
 
 	targetDockerfile := os.Getenv("TARGET_DOCKERFILE")
 	Expect(targetDockerfile).NotTo(BeEmpty(),
-		"TARGET_DOCKERFILE env var must be set to the path",
-		" of the Dockerfile to build the test image")
+		"TARGET_DOCKERFILE env var must point to the test Dockerfile")
 
-	// docker build ../test.Dockerfile --build-arg VERSION=re.Tag -t test-image:re.Tag .
 	// nolint: gosec // G204: this is acceptable since it's for tests only
 	buildCmd := exec.Command(
 		"docker", "build",
@@ -131,25 +147,22 @@ func (s *TestSuite) FetchImage(re *RegistryEntry) {
 		"-t", "test-image:"+re.Tag,
 		".",
 	)
-	Expect(buildCmd.Run()).To(Succeed())
 
-	// skopeo copy with flags:
-	// --format v2s2 --dest-compress --src-daemon-host <<DOCKER_HOST>> --insecure-policy
-	skopeoArgs := []string{
-		"copy",
-		"--format", "v2s2",
-		"--dest-compress",
+	out, err := buildCmd.CombinedOutput()
+	Expect(err).NotTo(HaveOccurred(), "docker build failed: %s", string(out))
+
+	// nolint: gosec // G204: this is acceptable since it's for tests only
+	cmd := exec.Command(
+		"skopeo", "copy",
 		"--src-daemon-host", dockerHost,
 		"--insecure-policy",
-		"docker-daemon:test-image:" + re.Tag,
-		"dir:" + re.FullPath(s.FsRoot),
-	}
-	// nolint: gosec // G204: this is acceptable since it's for tests only
-	cmd := exec.Command("skopeo", skopeoArgs...)
-
+		"docker-daemon:test-image:"+re.Tag,
+		"oci:"+re.ImagePath(s.FsRoot)+":"+re.Tag,
+	)
 	cmd.Env = append(os.Environ(), "DOCKER_HOST="+dockerHost)
 
-	Expect(cmd.Run()).To(Succeed())
+	out, err = cmd.CombinedOutput()
+	Expect(err).NotTo(HaveOccurred(), "skopeo copy failed: %s", string(out))
 }
 
 func (s *TestSuite) ClearImage(re *RegistryEntry) {
