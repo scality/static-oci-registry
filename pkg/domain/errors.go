@@ -20,4 +20,5 @@ var (
 	ErrInvalidParameter          = errors.New("invalid parameter")
 	ErrParameterOutOfRange       = errors.New("parameter out of range")
 	ErrInvalidRequest            = errors.New("invalid or malformed request")
+	ErrCertWatcher               = errors.New("certificate watcher error")
 )

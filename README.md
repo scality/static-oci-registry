@@ -91,3 +91,16 @@ This service can be configured through environment variables:
 > [!NOTE]
 > TLS is mandatory. The service will not start if `HTTP_TLS_CERT_FILE_PATH` or
 > `HTTP_TLS_KEY_FILE_PATH` are not set. TLS 1.2 is the minimum accepted version.
+
+### TLS certificate renewal
+
+The certificate and key files are watched on disk and reloaded automatically, so
+renewed certificates take effect **without restarting the server**. The
+certificate is resolved per-handshake (via `tls.Config.GetCertificate`), meaning
+new connections immediately use the latest certificate once it is reloaded.
+
+Reloads are driven by filesystem events (`fsnotify`) and, as a safety net, a
+periodic re-read of the files (every 120s). The watcher tolerates atomic swaps
+such as Kubernetes secret rotations - when the underlying file is renamed or
+replaced, the watch is re-established on the original path. The cached
+certificate is only swapped when the certificate or key actually changes.

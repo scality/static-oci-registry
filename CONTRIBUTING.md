@@ -34,5 +34,5 @@ make testfs
 
 You can then run the registry against it:
 ```bash
-docker run -e LOG_LEVEL='debug' -e HTTP_ADDR=':8080' -e FS_ROOT='/solutions' -v ./_testfs:/solutions -p 8080:8080 -it static-oci-registry:latest
+docker run -e LOG_LEVEL='debug' -e HTTP_ADDR=':8080' -e HTTP_TLS_CERT_FILE_PATH="/path/to/cert" -e HTTP_TLS_KEY_FILE_PATH="/path/to/key" -e FS_ROOT='/solutions' -v ./_testfs:/solutions -p 8080:8080 -it static-oci-registry:latest
 ```
