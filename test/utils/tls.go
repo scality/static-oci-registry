@@ -18,11 +18,23 @@ import (
 // GenerateSelfSignedCert writes a self-signed TLS certificate and key to files
 // in the given directory and returns their paths.
 func GenerateSelfSignedCert(dir string) (certFile, keyFile string) {
+	certFile = dir + "/cert.pem"
+	keyFile = dir + "/key.pem"
+
+	WriteSelfSignedCert(certFile, keyFile, 1)
+
+	return certFile, keyFile
+}
+
+// WriteSelfSignedCert writes a fresh self-signed TLS certificate and key to the
+// given paths, using serial as the certificate serial number so that callers
+// can generate distinguishable certificates (e.g. to exercise a reload).
+func WriteSelfSignedCert(certFile, keyFile string, serial int64) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	Expect(err).NotTo(HaveOccurred())
 
 	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: big.NewInt(serial),
 		Subject:      pkix.Name{CommonName: "localhost"},
 		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 		DNSNames:     []string{"localhost"},
@@ -32,9 +44,6 @@ func GenerateSelfSignedCert(dir string) (certFile, keyFile string) {
 
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	Expect(err).NotTo(HaveOccurred())
-
-	certFile = dir + "/cert.pem"
-	keyFile = dir + "/key.pem"
 
 	certOut, err := os.Create(certFile)
 	Expect(err).NotTo(HaveOccurred())
@@ -52,6 +61,4 @@ func GenerateSelfSignedCert(dir string) (certFile, keyFile string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	Expect(pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})).To(Succeed())
-
-	return certFile, keyFile
 }
