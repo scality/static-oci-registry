@@ -9,6 +9,7 @@ import (
 
 	"github.com/scality/static-oci-registry/cmd/config"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/blobpuller"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/certwatcher"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/digestmanifestfetcher"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/layoutwalker"
@@ -26,9 +27,10 @@ type Container struct {
 
 	logger *slog.Logger
 
-	TLSConfig  *tls.Config
-	router     http.Handler
-	httpServer *http.Server
+	TLSConfig   *tls.Config
+	certWatcher *certwatcher.CertWatcher
+	router      http.Handler
+	httpServer  *http.Server
 
 	listTagsHandler      *handler.ListTags
 	fetchManifestHandler *handler.FetchManifest

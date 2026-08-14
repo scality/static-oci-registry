@@ -46,3 +46,13 @@ it extensible for other kinds of content sources.
 >
 > All reads are performed on demand from disk (disk is the source of truth), so solutions,
 > versions, images, and tags can be added or removed without restarting the server.
+
+> [!NOTE]
+> **TLS certificate renewal.** The server is served over mandatory TLS, and the
+> certificate and key files are watched on disk (`pkg/infrastructure/certwatcher`).
+> The `tls.Config` resolves the certificate per-handshake via `GetCertificate`, so
+> renewed certificates are picked up **without restarting the server**. Reloads are
+> triggered by `fsnotify` filesystem events with a periodic re-read as a safety net,
+> and the watcher re-establishes its watch after atomic swaps (e.g. Kubernetes secret
+> rotations). It is a lightweight, dependency-free replacement for
+> `sigs.k8s.io/controller-runtime/pkg/certwatcher`.
