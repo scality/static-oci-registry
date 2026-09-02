@@ -6,9 +6,10 @@ it is built and why see [DESIGN.md](DESIGN.md).
 
 ## Development environment
 
-There is no devcontainer: install Go 1.26+, Docker and make on your `PATH`. The test and lint
+There is no devcontainer: install the Go version pinned in [go.mod](./go.mod), Docker and make on
+your `PATH`. `make testfs` needs `skopeo` and `make testcert` needs `openssl`. The test and lint
 workflow additionally uses [ginkgo](https://onsi.github.io/ginkgo/),
-[mockery](https://vektra.github.io/mockery/) and [golangci-lint](https://golangci-lint.run/) —
+[mockery](https://vektra.github.io/mockery/) and [golangci-lint](https://golangci-lint.run/):
 install them to run the full suite locally.
 
 Everyday commands:
@@ -25,6 +26,9 @@ go generate ./...      # regenerate the service mocks (mockery)
 golangci-lint run      # lint
 ```
 
+The OCI distribution conformance suite runs in CI only (`test-conformance.yaml`); there is no
+local `make` target for it.
+
 ## Architecture
 
 The project uses a clean-architecture layering with an inward-only dependency rule
@@ -39,6 +43,37 @@ type and place it in the layer that owns its responsibility:
 - framework and OS integrations (logging, DI, server setup) are adapters in
   `pkg/infrastructure`, wired together in the DI container;
 - the process entry point is `cmd/`.
+
+### Repository layout
+
+```text
+├── cmd/                  # Process entry point and startup wiring
+│   └── config/           # Environment configuration
+├── pkg/
+│   ├── domain/           # Core entities, interfaces and error sentinels
+│   │   └── ocierrors/    # OCI-specific error categories
+│   ├── service/          # Service interfaces (ports) consumed by the use cases
+│   │   └── mocks/        # Generated service mocks (mockery)
+│   ├── usecase/          # Application-specific operations (business logic)
+│   ├── infrastructure/   # Adapters, one package per capability, wired by di/
+│   │   ├── blobpuller/
+│   │   ├── certwatcher/
+│   │   ├── di/
+│   │   ├── digestmanifestfetcher/
+│   │   ├── imagefinder/
+│   │   ├── layoutwalker/
+│   │   ├── ocilayout/
+│   │   ├── taglister/
+│   │   └── tagmanifestfetcher/
+│   └── presentation/     # Presentation layer: HTTP handlers and formatting
+│       └── http/
+│           └── handler/  # HTTP request handlers
+└── test/                 # Test suites
+    ├── e2e/              # End-to-end tests
+    ├── integration/      # Integration tests
+    ├── unit/             # Unit tests
+    └── utils/            # Test utilities
+```
 
 ## Coding conventions
 
