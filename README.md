@@ -1,3 +1,8 @@
+[![Post Merge](https://github.com/scality/static-oci-registry/actions/workflows/post-merge.yaml/badge.svg)](https://github.com/scality/static-oci-registry/actions/workflows/post-merge.yaml)
+[![GitHub release](https://img.shields.io/github/v/release/scality/static-oci-registry)](https://github.com/scality/static-oci-registry/releases/latest)
+[![Go version](https://img.shields.io/github/go-mod/go-version/scality/static-oci-registry)](go.mod)
+[![License](https://img.shields.io/github/license/scality/static-oci-registry)](LICENSE)
+
 # Static Container Registy
 
 A container registry implementation that respects [OCI spec](https://github.com/opencontainers/distribution-spec/blob/v1.0.1/spec.md)
