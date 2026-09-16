@@ -24,9 +24,15 @@ const ApplicationName = "static-oci-registry"
 
 type (
 	Environment struct {
-		LogLevel string `env:"LOG_LEVEL, default=info"`
-		HTTP     HTTP   `env:",prefix=HTTP_"`
-		FS       FS     `env:",prefix=FS_"`
+		LogLevel string  `env:"LOG_LEVEL, default=info"`
+		HTTP     HTTP    `env:",prefix=HTTP_"`
+		FS       FS      `env:",prefix=FS_"`
+		Metrics  Metrics `env:",prefix=METRICS_"`
+	}
+	Metrics struct {
+		Addr   string `env:"ADDR, default=0"`
+		Secure bool   `env:"SECURE, default=true"`
+		TLS    TLS    `env:",prefix=TLS_"`
 	}
 	HTTP struct {
 		Addr string `env:"ADDR, default=:5000"`

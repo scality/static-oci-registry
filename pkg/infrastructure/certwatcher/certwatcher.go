@@ -94,6 +94,7 @@ func (cw *CertWatcher) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate,
 func (cw *CertWatcher) Start(ctx context.Context) error {
 	if err := cw.addWatches(ctx); err != nil {
 		_ = cw.watcher.Close()
+
 		return errors.Wrap(err,
 			errors.WithDetail("failed to start certwatcher"),
 		)

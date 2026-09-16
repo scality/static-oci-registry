@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/scality/static-oci-registry/cmd/config"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/blobpuller"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/certwatcher"
@@ -27,10 +28,16 @@ type Container struct {
 
 	logger *slog.Logger
 
-	TLSConfig   *tls.Config
-	certWatcher *certwatcher.CertWatcher
-	router      http.Handler
-	httpServer  *http.Server
+	TLSConfig       *tls.Config
+	router          http.Handler
+	httpCertWatcher *certwatcher.CertWatcher
+	httpServer      *http.Server
+
+	metricsServer      *http.Server
+	metricsHandler     http.Handler
+	metricsTLSConfig   *tls.Config
+	metricsCertWatcher *certwatcher.CertWatcher
+	metricsRegistry    *prometheus.Registry
 
 	listTagsHandler      *handler.ListTags
 	fetchManifestHandler *handler.FetchManifest

@@ -48,11 +48,14 @@ it extensible for other kinds of content sources.
 > versions, images, and tags can be added or removed without restarting the server.
 
 > [!NOTE]
-> **TLS certificate renewal.** The server is served over mandatory TLS, and the
-> certificate and key files are watched on disk (`pkg/infrastructure/certwatcher`).
-> The `tls.Config` resolves the certificate per-handshake via `GetCertificate`, so
-> renewed certificates are picked up **without restarting the server**. Reloads are
-> triggered by `fsnotify` filesystem events with a periodic re-read as a safety net,
-> and the watcher re-establishes its watch after atomic swaps (e.g. Kubernetes secret
+> **TLS certificate renewal.** The OCI listener is served over mandatory TLS;
+> the metrics listener is served over TLS by default and can be switched to
+> plain HTTP via `METRICS_SECURE=false`. Each TLS listener has its own
+> independent certificate/key pair, watched on disk
+> (`pkg/infrastructure/certwatcher`). The `tls.Config` resolves the certificate
+> per-handshake via `GetCertificate`, so renewed certificates are picked up
+> **without restarting the server**. Reloads are triggered by `fsnotify`
+> filesystem events with a periodic re-read as a safety net, and the watcher
+> re-establishes its watch after atomic swaps (e.g. Kubernetes secret
 > rotations). It is a lightweight, dependency-free replacement for
 > `sigs.k8s.io/controller-runtime/pkg/certwatcher`.
