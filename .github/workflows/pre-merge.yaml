@@ -31,7 +31,7 @@ jobs:
       - name: Install mockery
         env:
           # renovate: datasource=github-releases depName=vektra/mockery
-          MOCKERY_VERSION: v3.7.1
+          MOCKERY_VERSION: v3.8.0
         run: go install github.com/vektra/mockery/v3@${{ env.MOCKERY_VERSION }}
       - name: Ensure go generate as been run if needed
         # We run go generate and then check if there are any changes
