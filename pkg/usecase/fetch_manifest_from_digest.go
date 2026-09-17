@@ -1,7 +1,7 @@
 // FetchManifestFromDigest and FetchManifestFromTag are very similar
 // but combining them would couple dispatch logic (tag vs. digest) to the usecase
 //
-// nolint:dupl // see above
+//nolint:dupl // see above
 package usecase
 
 import (

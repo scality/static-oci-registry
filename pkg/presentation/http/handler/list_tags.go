@@ -43,6 +43,12 @@ func (*ListTags) AllowedMethods() []string {
 	return []string{http.MethodGet}
 }
 
+// EndpointName returns the OCI-spec label of this route, used as the
+// `endpoint` HTTP metric label.
+func (*ListTags) EndpointName() string {
+	return "list_tags"
+}
+
 func (h *ListTags) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

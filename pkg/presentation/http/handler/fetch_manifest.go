@@ -10,6 +10,7 @@ import (
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 	httplayer "github.com/scality/static-oci-registry/pkg/presentation/http"
+	"github.com/scality/static-oci-registry/pkg/presentation/http/reqlabels"
 	"github.com/scality/static-oci-registry/pkg/usecase"
 )
 
@@ -26,6 +27,12 @@ func (*FetchManifest) Matches(path string) bool {
 // end-2/end-3 of the OCI distribution-spec accept GET and HEAD.
 func (*FetchManifest) AllowedMethods() []string {
 	return []string{http.MethodGet, http.MethodHead}
+}
+
+// EndpointName returns the OCI-spec label of this route, used as the
+// `endpoint` HTTP metric label.
+func (*FetchManifest) EndpointName() string {
+	return "fetch_manifest"
 }
 
 type FetchManifestInput struct {
@@ -82,6 +89,11 @@ func (h *FetchManifest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httplayer.HandleError(ctx, w, err, h.logger)
 		return
 	}
+
+	// Record which (solution, version) served the request so HTTP metrics
+	// can label the observation. Safe to call even if no metrics middleware
+	// installed the bag.
+	reqlabels.From(ctx).SetSolution(fetchManifestOutput.SolutionVersion)
 
 	// respond with json
 	// must set Content-Type to mediaType and

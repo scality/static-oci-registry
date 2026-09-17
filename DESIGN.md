@@ -59,3 +59,16 @@ it extensible for other kinds of content sources.
 > re-establishes its watch after atomic swaps (e.g. Kubernetes secret
 > rotations). It is a lightweight, dependency-free replacement for
 > `sigs.k8s.io/controller-runtime/pkg/certwatcher`.
+
+> [!NOTE]
+> **HTTP metrics.** The `/v2/` subtree is wrapped by a middleware
+> (`pkg/presentation/http/metricsmw`) that composes `promhttp`'s counter and
+> duration instrumenters. Endpoint and solution labels are carried through the
+> request via a mutable bag (`pkg/presentation/http/reqlabels`) installed on
+> the request context: the router sets `Endpoint` on route match, and the
+> `FetchManifest` / `PullBlob` handlers write `SolutionName`/`SolutionVersion`
+> after the usecase returns. `service.Layout` exposes `SolutionVersion()` so
+> infrastructure adapters can populate the winning `(solution, version)` tuple
+> on their outputs without string-parsing the layout path. The `registry`
+> label is resolved once at startup from `REGISTRY_NAME`
+> (`os.Hostname()` fallback) and curried into the vecs.

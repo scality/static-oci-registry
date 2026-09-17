@@ -17,6 +17,7 @@ import (
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/tagmanifestfetcher"
 	"github.com/scality/static-oci-registry/pkg/presentation/http/handler"
+	"github.com/scality/static-oci-registry/pkg/presentation/http/metricsmw"
 	"github.com/scality/static-oci-registry/pkg/usecase"
 )
 
@@ -38,6 +39,8 @@ type Container struct {
 	metricsTLSConfig   *tls.Config
 	metricsCertWatcher *certwatcher.CertWatcher
 	metricsRegistry    *prometheus.Registry
+	requestMetrics     *metricsmw.RequestMetrics
+	registryName       string
 
 	listTagsHandler      *handler.ListTags
 	fetchManifestHandler *handler.FetchManifest

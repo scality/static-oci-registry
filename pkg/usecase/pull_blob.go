@@ -1,8 +1,11 @@
+// PullBlob is structurally similar to FetchManifestFromDigest but semantically
+// distinct: it streams blob bytes rather than returning a decoded manifest.
+//
+//nolint:dupl // see above
 package usecase
 
 import (
 	"context"
-	"io"
 	"log/slog"
 
 	"github.com/scality/go-errors"
@@ -29,17 +32,17 @@ func (uc *PullBlob) Execute(
 	ctx context.Context,
 	imageName domain.ImageName,
 	digest domain.Digest,
-) (io.ReadSeekCloser, error) {
+) (*domain.PullBlobOutput, error) {
 	l := uc.logger.With(
 		slog.String("image_name", string(imageName)),
 		slog.String("digest", string(digest)),
 	)
 	l.InfoContext(ctx, "Pulling blob")
 
-	readseekcloser, err := uc.blobPuller.PullBlob(ctx, imageName, digest)
+	out, err := uc.blobPuller.PullBlob(ctx, imageName, digest)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.WithDetail("failed to pull blob"))
 	}
 
-	return readseekcloser, nil
+	return out, nil
 }

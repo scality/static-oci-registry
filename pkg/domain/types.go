@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"io"
 	"regexp"
 	"strings"
 )
@@ -75,6 +76,14 @@ type (
 		MediaType     string
 		ContentDigest Digest
 		ManifestBytes []byte
+		// SolutionVersion whose layout produced this manifest. Used for metrics.
+		SolutionVersion SolutionVersion
+	}
+
+	PullBlobOutput struct {
+		Body io.ReadSeekCloser
+		// SolutionVersion whose layout produced this blob. Used for metrics.
+		SolutionVersion SolutionVersion
 	}
 )
 

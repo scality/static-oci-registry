@@ -96,6 +96,13 @@ This service can be configured through environment variables:
 | METRICS_SECURE             | When `true` (default), the metrics listener uses TLS. Set to `false` to serve metrics over plain HTTP           |
 | METRICS_TLS_CERT_FILE_PATH | Path to the TLS certificate file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
 | METRICS_TLS_KEY_FILE_PATH  | Path to the TLS private key file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
+| REGISTRY_NAME              | Value for the `registry` HTTP-metric label. Defaults to the container hostname                                  |
+
+The metrics endpoint exposes (labelled by `method`, `code`, `endpoint`,
+`solution_name`, `solution_version`, `registry`):
+
+- `registry_http_requests_total` — counter of served OCI requests
+- `registry_http_request_duration_seconds` — histogram of request durations
 
 > [!NOTE]
 > The OCI listener requires TLS: the service will not start without

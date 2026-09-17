@@ -24,10 +24,18 @@ const ApplicationName = "static-oci-registry"
 
 type (
 	Environment struct {
-		LogLevel string  `env:"LOG_LEVEL, default=info"`
-		HTTP     HTTP    `env:",prefix=HTTP_"`
-		FS       FS      `env:",prefix=FS_"`
-		Metrics  Metrics `env:",prefix=METRICS_"`
+		LogLevel string   `env:"LOG_LEVEL, default=info"`
+		HTTP     HTTP     `env:",prefix=HTTP_"`
+		FS       FS       `env:",prefix=FS_"`
+		Metrics  Metrics  `env:",prefix=METRICS_"`
+		Registry Registry `env:",prefix=REGISTRY_"`
+	}
+	// Registry carries process-wide identity, used as the `registry` label
+	// on all HTTP metrics. When Name is empty at load time, the DI layer
+	// falls back to os.Hostname() (with an empty-string last resort if that
+	// lookup fails).
+	Registry struct {
+		Name string `env:"NAME"`
 	}
 	Metrics struct {
 		Addr   string `env:"ADDR, default=0"`

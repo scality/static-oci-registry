@@ -24,25 +24,45 @@ const (
 // caches the parsed index.json for the lifetime of this value only (one
 // request); it never caches across requests.
 type Layout struct {
-	logger *slog.Logger
-	root   *os.Root
-	path   string // "<solution>/<version>/<image>" relative to root
+	logger    *slog.Logger
+	root      *os.Root
+	path      string // "<solution>/<version>/<image>" relative to root
+	solution  domain.SolutionVersion
+	imageName domain.ImageName
 
 	index *domain.Index // lazily loaded, request-scoped cache
 }
 
 var _ service.Layout = (*Layout)(nil)
 
-func NewLayout(logger *slog.Logger, root *os.Root, path string) *Layout {
+// NewLayout builds a Layout that reads the OCI image layout at
+// "<sv.Solution>/<sv.Version>/<imageName>" beneath root. The (solution,
+// version) tuple is retained separately so SolutionVersion() can return it
+// without re-parsing the path.
+func NewLayout(
+	logger *slog.Logger,
+	root *os.Root,
+	sv domain.SolutionVersion,
+	imageName domain.ImageName,
+) *Layout {
+	path := strings.Join([]string{sv.Solution, sv.Version, imageName.String()}, "/")
+
 	return &Layout{
-		logger: logger.With(slog.String("ocilayout", path)),
-		root:   root,
-		path:   path,
+		logger:    logger.With(slog.String("ocilayout", path)),
+		root:      root,
+		path:      path,
+		solution:  sv,
+		imageName: imageName,
 	}
 }
 
 func (l *Layout) Location() string {
 	return l.path
+}
+
+// SolutionVersion returns the (solution, version) tuple this layout was built from.
+func (l *Layout) SolutionVersion() domain.SolutionVersion {
+	return l.solution
 }
 
 func (l *Layout) readIndex(_ context.Context) (*domain.Index, error) {
