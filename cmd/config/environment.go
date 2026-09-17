@@ -38,9 +38,10 @@ type (
 		Name string `env:"NAME"`
 	}
 	Metrics struct {
-		Addr   string `env:"ADDR, default=0"`
-		Secure bool   `env:"SECURE, default=true"`
-		TLS    TLS    `env:",prefix=TLS_"`
+		Addr       string `env:"ADDR, default=0"`
+		Secure     bool   `env:"SECURE, default=true"`
+		Kubeconfig string `env:"KUBECONFIG"`
+		TLS        TLS    `env:",prefix=TLS_"`
 	}
 	HTTP struct {
 		Addr string `env:"ADDR, default=:5000"`

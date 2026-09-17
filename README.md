@@ -93,9 +93,10 @@ This service can be configured through environment variables:
 | HTTP_TLS_CERT_FILE_PATH    | Path to the TLS certificate file (PEM) for the OCI listener. **Required.**                                      |
 | HTTP_TLS_KEY_FILE_PATH     | Path to the TLS private key file (PEM) for the OCI listener. **Required.**                                      |
 | METRICS_ADDR               | Sets the address the metrics listener binds to. Defaults to `0`, which disables the metrics endpoint. Set to a `host:port` (e.g. `:8443`) to enable |
-| METRICS_SECURE             | When `true` (default), the metrics listener uses TLS. Set to `false` to serve metrics over plain HTTP           |
+| METRICS_SECURE             | When `true` (default), the metrics listener uses TLS **and** requires kubebuilder-style authn/authz. Set to `false` for plain HTTP with no auth |
 | METRICS_TLS_CERT_FILE_PATH | Path to the TLS certificate file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
 | METRICS_TLS_KEY_FILE_PATH  | Path to the TLS private key file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
+| METRICS_KUBECONFIG         | Optional path to a kubeconfig used by the metrics auth filter. Empty ⇒ in-cluster config                        |
 | REGISTRY_NAME              | Value for the `registry` HTTP-metric label. Defaults to the container hostname                                  |
 
 The metrics endpoint exposes (labelled by `method`, `code`, `endpoint`,

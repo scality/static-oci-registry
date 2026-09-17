@@ -45,10 +45,16 @@ func (c *Container) getUnsupportedHandler() *handler.UnsupportedEndpoint {
 
 func (c *Container) getMetricsHandler() http.Handler {
 	if c.metricsHandler == nil {
-		c.metricsHandler = metrics.NewHandler(
+		h := metrics.NewHandler(
 			c.GetLogger(),
 			c.getMetricsRegistry(),
 		)
+
+		if c.config.Metrics.Secure {
+			h = c.wrapMetricsHandlerWithAuth(h)
+		}
+
+		c.metricsHandler = h
 	}
 
 	return c.metricsHandler

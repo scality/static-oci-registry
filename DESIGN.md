@@ -72,3 +72,14 @@ it extensible for other kinds of content sources.
 > on their outputs without string-parsing the layout path. The `registry`
 > label is resolved once at startup from `REGISTRY_NAME`
 > (`os.Hostname()` fallback) and curried into the vecs.
+
+> [!NOTE]
+> **Metrics scrape auth.** When `METRICS_SECURE=true`, the `/metrics` handler
+> is wrapped with `controller-runtime`'s
+> `filters.WithAuthenticationAndAuthorization`: bearer tokens are validated
+> via `TokenReview` and the caller must be authorized (via
+> `SubjectAccessReview`) to `get` the non-resource URL `/metrics`. This is the
+> same middleware modern kubebuilder projects scaffold. The Kubernetes REST
+> config is resolved in-cluster by default; `METRICS_KUBECONFIG` overrides it
+> for local development. Auth is only applied when TLS is enabled so bearer
+> tokens are never accepted over plaintext.

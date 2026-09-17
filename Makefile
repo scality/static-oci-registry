@@ -73,6 +73,7 @@ JUNIT_REPORT_DIR ?= .
 .PHONY: unit-test
 unit-test:
 	ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-unit.xml test/unit
+	go test ./pkg/...
 
 .PHONY: integration-test
 integration-test:
