@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -30,7 +31,10 @@ var (
 	cancel context.CancelFunc
 	cfg    *config.Environment
 
-	httpServer *http.Server
+	httpServer    *http.Server
+	metricsServer *http.Server
+	metricsAddr   string
+	registryName  = "integration-test"
 )
 
 func TestIntegration(t *testing.T) {
@@ -107,6 +111,9 @@ var _ = BeforeSuite(func() {
 	// fill cfg values
 	cfg.FS.Root = suite.FsRoot
 	cfg.LogLevel = "error"
+	cfg.Metrics.Addr = ":0"
+	cfg.Metrics.Secure = false
+	cfg.Registry.Name = registryName
 
 	// generate a self-signed cert for TLS
 	cfg.HTTP.TLS.CertFilePath, cfg.HTTP.TLS.KeyFilePath = utils.GenerateSelfSignedCert(suite.FsRoot)
@@ -119,9 +126,21 @@ var _ = BeforeSuite(func() {
 
 	// start https server
 	httpServer = container.GetHTTPServer()
+	metricsServer = container.GetMetricsServer()
+	Expect(metricsServer).NotTo(BeNil())
+
+	metricsListener, err := net.Listen("tcp", cfg.Metrics.Addr)
+	Expect(err).NotTo(HaveOccurred())
+
+	metricsAddr = "http://" + metricsListener.Addr().String()
 
 	go func() {
 		serveErr := httpServer.ListenAndServeTLS("", "")
+		Expect(serveErr).To(MatchError(http.ErrServerClosed))
+	}()
+
+	go func() {
+		serveErr := metricsServer.Serve(metricsListener)
 		Expect(serveErr).To(MatchError(http.ErrServerClosed))
 	}()
 
@@ -131,11 +150,21 @@ var _ = BeforeSuite(func() {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // self-signed cert in tests
 		},
 	}
+	plainClient := &http.Client{
+		Timeout: timeoutDurationInSeconds * time.Second,
+	}
 
 	Expect(
 		waitForServer(
 			insecureClient,
 			"https://localhost"+cfg.HTTP.Addr+"/v2/",
+			timeoutDurationInSeconds*time.Second,
+		),
+	).To(BeTrue())
+	Expect(
+		waitForServer(
+			plainClient,
+			metricsAddr+"/metrics",
 			timeoutDurationInSeconds*time.Second,
 		),
 	).To(BeTrue())
@@ -152,12 +181,21 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	cancel()
-
+	defer cancel()
 	defer suite.CleanupFsRoot()
 
-	err := httpServer.Shutdown(ctx)
-	Expect(err).NotTo(HaveOccurred())
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeoutDurationInSeconds*time.Second)
+	defer shutdownCancel()
+
+	if metricsServer != nil {
+		err := metricsServer.Shutdown(shutdownCtx)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	if httpServer != nil {
+		err := httpServer.Shutdown(shutdownCtx)
+		Expect(err).NotTo(HaveOccurred())
+	}
 })
 
 func waitForServer(client *http.Client, url string, timeout time.Duration) bool {

@@ -83,3 +83,19 @@ it extensible for other kinds of content sources.
 > config is resolved in-cluster by default; `METRICS_KUBECONFIG` overrides it
 > for local development. Auth is only applied when TLS is enabled so bearer
 > tokens are never accepted over plaintext.
+
+> [!NOTE]
+> **Testing tiers for metrics.** The metrics surface has three tiers of
+> coverage: colocated stdlib `_test.go` files under `pkg/` for pure logic
+> (label bags, middleware wiring, endpoint names, kubeconfig loading); a
+> Ginkgo integration suite in `test/integration/` that boots the real HTTPS
+> server plus a plain-HTTP metrics listener on an ephemeral port and asserts
+> scrape output over the wire (endpoint plumbing, RED counter and histogram
+> values, error labels, route exclusion); and a Ginkgo kube suite in
+> `test/kube/` that exercises the auth filter against a real `kube-apiserver`
+> + `etcd` spawned locally by `sigs.k8s.io/controller-runtime/pkg/envtest`.
+> The kube suite provisions bearer tokens via `--token-auth-file`, installs
+> `nonResourceURLs: [/metrics] verbs: [get]` RBAC for a scraper user, and
+> asserts real `TokenReview` + `SubjectAccessReview` outcomes. Local runs
+> and CI both resolve `KUBEBUILDER_ASSETS` via `setup-envtest`; CI caches
+> the ~160 MB binary set keyed on the target Kubernetes version.

@@ -74,3 +74,7 @@ jobs:
     secrets: inherit
     with:
       image_tag: ${{ needs.build.outputs.image_tag }}
+
+  test-kube:
+    uses: ./.github/workflows/test-kube.yaml
+    secrets: inherit

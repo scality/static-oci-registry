@@ -70,6 +70,10 @@ clean:
 
 JUNIT_REPORT_DIR ?= .
 
+ENVTEST_K8S_VERSION ?= 1.34.x!
+SETUP_ENVTEST ?= setup-envtest
+KUBEBUILDER_ASSETS ?= $(shell $(SETUP_ENVTEST) use -p path $(ENVTEST_K8S_VERSION) 2>/dev/null)
+
 .PHONY: unit-test
 unit-test:
 	ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-unit.xml test/unit
@@ -82,3 +86,14 @@ integration-test:
 .PHONY: e2e-test
 e2e-test:
 	ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-e2e.xml test/e2e
+
+.PHONY: kube-test
+kube-test:
+	@if [ -z "$(KUBEBUILDER_ASSETS)" ]; then \
+		echo "kube-test: KUBEBUILDER_ASSETS is empty."; \
+		echo "  Install setup-envtest: go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.22"; \
+		echo "  Then run: $(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION)"; \
+		echo "  Or pass KUBEBUILDER_ASSETS=<path> to make."; \
+		exit 1; \
+	fi
+	KUBEBUILDER_ASSETS=$(KUBEBUILDER_ASSETS) ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-kube.xml test/kube
