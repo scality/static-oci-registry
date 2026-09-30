@@ -81,6 +81,14 @@ Images can be produced with
 modified while the server runs - solutions, versions, images and tags are read on demand on
 each request, so additions and removals take effect without a restart.
 
+## Metrics
+
+The metrics endpoint, when enabled, exposes (labelled by `method`, `code`, `endpoint`,
+`solution_name`, `solution_version`, `registry`):
+
+- `registry_http_requests_total` — counter of served OCI requests
+- `registry_http_request_duration_seconds` — histogram of request durations
+
 ## Environment variables
 
 This service can be configured through environment variables:
@@ -96,14 +104,9 @@ This service can be configured through environment variables:
 | METRICS_SECURE             | When `true` (default), the metrics listener uses TLS **and** requires kubebuilder-style authn/authz. Set to `false` for plain HTTP with no auth |
 | METRICS_TLS_CERT_FILE_PATH | Path to the TLS certificate file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
 | METRICS_TLS_KEY_FILE_PATH  | Path to the TLS private key file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
-| METRICS_KUBECONFIG         | Optional path to a kubeconfig used by the metrics auth filter. Empty ⇒ in-cluster config                        |
+| METRICS_KUBECONFIG         | Optional path to a kubeconfig used for metrics authN/authZ (TokenReview/SubjectAccessReview). Empty ⇒ in-cluster config. |
 | REGISTRY_NAME              | Value for the `registry` HTTP-metric label. Defaults to the container hostname                                  |
 
-The metrics endpoint exposes (labelled by `method`, `code`, `endpoint`,
-`solution_name`, `solution_version`, `registry`):
-
-- `registry_http_requests_total` — counter of served OCI requests
-- `registry_http_request_duration_seconds` — histogram of request durations
 
 > [!NOTE]
 > The OCI listener requires TLS: the service will not start without

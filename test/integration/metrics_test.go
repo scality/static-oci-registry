@@ -14,8 +14,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
-	"github.com/scality/static-oci-registry/pkg/presentation/http/metricsmw"
 	"github.com/scality/static-oci-registry/test/utils"
 )
 
@@ -67,12 +67,12 @@ var _ = Describe("Metrics endpoint", Ordered, func() {
 			Tag:      "3.22.2",
 		}
 		wantLabels := map[string]string{
-			metricsmw.LabelMethod:          strings.ToLower(http.MethodGet),
-			metricsmw.LabelCode:            "200",
-			metricsmw.LabelEndpoint:        "list_tags",
-			metricsmw.LabelSolutionName:    "",
-			metricsmw.LabelSolutionVersion: "",
-			metricsmw.LabelRegistry:        registryName,
+			domain.LabelMethod:          strings.ToLower(http.MethodGet),
+			domain.LabelCode:            "200",
+			domain.LabelEndpoint:        "list_tags",
+			domain.LabelSolutionName:    "",
+			domain.LabelSolutionVersion: "",
+			domain.LabelRegistry:        registryName,
 		}
 
 		BeforeAll(func() {
@@ -126,16 +126,16 @@ var _ = Describe("Metrics endpoint", Ordered, func() {
 
 			families := scrapeMetrics(metricsClient)
 			getLabels := map[string]string{
-				metricsmw.LabelMethod:   strings.ToLower(http.MethodGet),
-				metricsmw.LabelCode:     "404",
-				metricsmw.LabelEndpoint: "list_tags",
-				metricsmw.LabelRegistry: registryName,
+				domain.LabelMethod:   strings.ToLower(http.MethodGet),
+				domain.LabelCode:     "404",
+				domain.LabelEndpoint: "list_tags",
+				domain.LabelRegistry: registryName,
 			}
 			putLabels := map[string]string{
-				metricsmw.LabelMethod:   strings.ToLower(http.MethodPut),
-				metricsmw.LabelCode:     "404",
-				metricsmw.LabelEndpoint: "list_tags",
-				metricsmw.LabelRegistry: registryName,
+				domain.LabelMethod:   strings.ToLower(http.MethodPut),
+				domain.LabelCode:     "404",
+				domain.LabelEndpoint: "list_tags",
+				domain.LabelRegistry: registryName,
 			}
 
 			getCounter, ok := utils.FindCounter(families[requestsTotalMetric], getLabels)
@@ -173,10 +173,10 @@ var _ = Describe("Metrics endpoint", Ordered, func() {
 	Context("Unknown route fallback", func() {
 		It("emits a counter with endpoint=\"unknown\" when the /v2/ path matches no route", func() {
 			wantLabels := map[string]string{
-				metricsmw.LabelMethod:   strings.ToLower(http.MethodGet),
-				metricsmw.LabelCode:     "404",
-				metricsmw.LabelEndpoint: metricsmw.EndpointUnknown,
-				metricsmw.LabelRegistry: registryName,
+				domain.LabelMethod:   strings.ToLower(http.MethodGet),
+				domain.LabelCode:     "404",
+				domain.LabelEndpoint: domain.EndpointUnknown,
+				domain.LabelRegistry: registryName,
 			}
 
 			before := scrapeMetrics(metricsClient)
@@ -202,7 +202,7 @@ var _ = Describe("Metrics endpoint", Ordered, func() {
 			// missing bag values; this check catches regressions where a
 			// new code path forgets to call SetEndpoint.
 			for _, metric := range after[requestsTotalMetric].GetMetric() {
-				Expect(labelValue(metric.GetLabel(), metricsmw.LabelEndpoint)).
+				Expect(labelValue(metric.GetLabel(), domain.LabelEndpoint)).
 					NotTo(BeEmpty(), "counter series has empty endpoint label: %v", metric.GetLabel())
 			}
 		})
@@ -240,7 +240,7 @@ func counterSumForEndpoints(fam *dto.MetricFamily, endpoints map[string]struct{}
 	var sum float64
 
 	for _, metric := range fam.GetMetric() {
-		if _, ok := endpoints[labelValue(metric.GetLabel(), metricsmw.LabelEndpoint)]; ok {
+		if _, ok := endpoints[labelValue(metric.GetLabel(), domain.LabelEndpoint)]; ok {
 			sum += metric.GetCounter().GetValue()
 		}
 	}
@@ -252,7 +252,7 @@ func histogramCountSumForEndpoints(fam *dto.MetricFamily, endpoints map[string]s
 	var sum uint64
 
 	for _, metric := range fam.GetMetric() {
-		if _, ok := endpoints[labelValue(metric.GetLabel(), metricsmw.LabelEndpoint)]; ok {
+		if _, ok := endpoints[labelValue(metric.GetLabel(), domain.LabelEndpoint)]; ok {
 			sum += metric.GetHistogram().GetSampleCount()
 		}
 	}

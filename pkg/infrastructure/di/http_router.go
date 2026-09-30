@@ -3,6 +3,7 @@ package di
 import (
 	"net/http"
 
+	"github.com/scality/static-oci-registry/pkg/domain"
 	apphttp "github.com/scality/static-oci-registry/pkg/presentation/http"
 	"github.com/scality/static-oci-registry/pkg/presentation/http/metricsmw"
 )
@@ -34,7 +35,11 @@ func (c *Container) getHTTPRouter() http.Handler {
 			c.getPullBlobHandler(),
 		)
 
-		httpRouter.Handle("/v2/", metricsmw.Wrap(v2Router, c.getRequestMetrics(), c.getRegistryName()))
+		httpRouter.Handle("/v2/", metricsmw.Wrap(
+			v2Router,
+			&domain.RegistryRequestMetrics,
+			c.getRegistryName(),
+		))
 
 		c.router = httpRouter
 	}

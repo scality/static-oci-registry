@@ -14,17 +14,18 @@ import (
 	"github.com/scality/static-oci-registry/pkg/presentation/http/reqlabels"
 )
 
-// buildMetrics constructs a fresh metricsmw.RequestMetrics registered against a
-// process-local registry so each test observation is isolated.
-func buildMetrics(t *testing.T) (*prometheus.Registry, *metricsmw.RequestMetrics) {
+// buildMetrics constructs a fresh pair of request vecs registered on a
+// process-local registry so each test observation is isolated from the
+// package-level RegistryRequestMetrics singleton.
+func buildMetrics(t *testing.T) (*prometheus.Registry, *domain.RequestMetrics) {
 	t.Helper()
 
 	reg := prometheus.NewRegistry()
-
-	m, err := metricsmw.NewRequestMetrics(reg)
-	if err != nil {
-		t.Fatalf("metricsmw.NewRequestMetrics: %v", err)
+	m := &domain.RequestMetrics{
+		Requests: domain.NewRequestsCounter(),
+		Duration: domain.NewRequestDuration(),
 	}
+	reg.MustRegister(m.Requests, m.Duration)
 
 	return reg, m
 }
@@ -111,12 +112,12 @@ func TestWrap_capturesAllLabels(t *testing.T) {
 	}
 
 	want := map[string]string{
-		metricsmw.LabelMethod:          "get",
-		metricsmw.LabelCode:            "200",
-		metricsmw.LabelEndpoint:        "pull_blob",
-		metricsmw.LabelSolutionName:    "acme",
-		metricsmw.LabelSolutionVersion: "2.3.4",
-		metricsmw.LabelRegistry:        "reg-1",
+		domain.LabelMethod:          "get",
+		domain.LabelCode:            "200",
+		domain.LabelEndpoint:        "pull_blob",
+		domain.LabelSolutionName:    "acme",
+		domain.LabelSolutionVersion: "2.3.4",
+		domain.LabelRegistry:        "reg-1",
 	}
 
 	counters := gather(t, reg, "registry_http_requests_total")
@@ -150,12 +151,12 @@ func TestWrap_missingSolutionYieldsEmptyLabels(t *testing.T) {
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	want := map[string]string{
-		metricsmw.LabelMethod:          "get",
-		metricsmw.LabelCode:            "200",
-		metricsmw.LabelEndpoint:        "list_tags",
-		metricsmw.LabelSolutionName:    "",
-		metricsmw.LabelSolutionVersion: "",
-		metricsmw.LabelRegistry:        "reg-x",
+		domain.LabelMethod:          "get",
+		domain.LabelCode:            "200",
+		domain.LabelEndpoint:        "list_tags",
+		domain.LabelSolutionName:    "",
+		domain.LabelSolutionVersion: "",
+		domain.LabelRegistry:        "reg-x",
 	}
 
 	counters := gather(t, reg, "registry_http_requests_total")
@@ -178,10 +179,10 @@ func TestWrap_capturesErrorCode(t *testing.T) {
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	want := map[string]string{
-		metricsmw.LabelMethod:   "head",
-		metricsmw.LabelCode:     "404",
-		metricsmw.LabelEndpoint: "fetch_manifest",
-		metricsmw.LabelRegistry: "r",
+		domain.LabelMethod:   "head",
+		domain.LabelCode:     "404",
+		domain.LabelEndpoint: "fetch_manifest",
+		domain.LabelRegistry: "r",
 	}
 
 	counters := gather(t, reg, "registry_http_requests_total")
@@ -206,10 +207,10 @@ func TestWrap_endpointFallbackWhenNoRouteMatched(t *testing.T) {
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	want := map[string]string{
-		metricsmw.LabelMethod:   "get",
-		metricsmw.LabelCode:     "404",
-		metricsmw.LabelEndpoint: metricsmw.EndpointUnknown,
-		metricsmw.LabelRegistry: "reg-z",
+		domain.LabelMethod:   "get",
+		domain.LabelCode:     "404",
+		domain.LabelEndpoint: domain.EndpointUnknown,
+		domain.LabelRegistry: "reg-z",
 	}
 
 	counters := gather(t, reg, "registry_http_requests_total")
@@ -219,7 +220,7 @@ func TestWrap_endpointFallbackWhenNoRouteMatched(t *testing.T) {
 
 	for _, sample := range counters.GetMetric() {
 		for _, lp := range sample.GetLabel() {
-			if lp.GetName() == metricsmw.LabelEndpoint && lp.GetValue() == "" {
+			if lp.GetName() == domain.LabelEndpoint && lp.GetValue() == "" {
 				t.Fatalf("found a counter series with endpoint=\"\": %v", sample.GetLabel())
 			}
 		}

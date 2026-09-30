@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/scality/static-oci-registry/pkg/presentation/http/metricsmw"
+	"github.com/scality/static-oci-registry/pkg/domain"
 )
 
 // getMetricsRegistry returns the process-wide Prometheus registry. Lazily
@@ -13,31 +13,15 @@ import (
 func (c *Container) getMetricsRegistry() *prometheus.Registry {
 	if c.metricsRegistry == nil {
 		c.metricsRegistry = prometheus.NewRegistry()
+
+		// register the metrics here
+		c.metricsRegistry.MustRegister(
+			domain.RegistryRequestMetrics.Requests,
+			domain.RegistryRequestMetrics.Duration,
+		)
 	}
 
 	return c.metricsRegistry
-}
-
-// getRequestMetrics builds and registers the HTTP request-scoped vecs
-// (counter and duration histogram). Registration failures are treated as
-// fatal because a duplicate registration is a programming error, not a
-// runtime condition.
-func (c *Container) getRequestMetrics() *metricsmw.RequestMetrics {
-	if c.requestMetrics != nil {
-		return c.requestMetrics
-	}
-
-	m, err := metricsmw.NewRequestMetrics(c.getMetricsRegistry())
-	if err != nil {
-		c.GetLogger().ErrorContext(c.ctx, "failed to register HTTP request metrics",
-			slog.Any("error", err),
-		)
-		os.Exit(1) //nolint:revive // startup misconfiguration is fatal
-	}
-
-	c.requestMetrics = m
-
-	return c.requestMetrics
 }
 
 // getRegistryName resolves the value of the `registry` HTTP-metric label. It

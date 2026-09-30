@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/presentation/http/reqlabels"
 )
 
@@ -24,20 +25,20 @@ import (
 // The `registry` label is curried into the vecs at construction so the fully
 // labelled child vec is fixed for the lifetime of the process and no dynamic
 // registry-value plumbing is needed.
-func Wrap(next http.Handler, m *RequestMetrics, registry string) http.Handler {
-	registryLabels := prometheus.Labels{LabelRegistry: registry}
+func Wrap(next http.Handler, m *domain.RequestMetrics, registry string) http.Handler {
+	registryLabels := prometheus.Labels{domain.LabelRegistry: registry}
 
 	// MustCurryWith panics only if `registry` is not a defined label on the
 	// vec, which is a programming error caught by unit tests.
 	counter := m.Requests.MustCurryWith(registryLabels)
 	duration := m.Duration.MustCurryWith(registryLabels)
 
-	endpointFromCtx := promhttp.WithLabelFromCtx(LabelEndpoint, endpointLabel)
+	endpointFromCtx := promhttp.WithLabelFromCtx(domain.LabelEndpoint, endpointLabel)
 	solutionNameFromCtx := promhttp.WithLabelFromCtx(
-		LabelSolutionName, solutionNameLabel,
+		domain.LabelSolutionName, solutionNameLabel,
 	)
 	solutionVersionFromCtx := promhttp.WithLabelFromCtx(
-		LabelSolutionVersion, solutionVersionLabel,
+		domain.LabelSolutionVersion, solutionVersionLabel,
 	)
 
 	instrumented := promhttp.InstrumentHandlerCounter(
@@ -64,7 +65,7 @@ func endpointLabel(ctx context.Context) string {
 	// The bag stays empty when a /v2/ request matched no route. Folding all
 	// such requests into a single "unknown" series keeps them countable
 	// without letting attacker-controlled URLs blow up label cardinality.
-	return EndpointUnknown
+	return domain.EndpointUnknown
 }
 
 func solutionNameLabel(ctx context.Context) string {

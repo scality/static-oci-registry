@@ -30,10 +30,7 @@ type (
 		Metrics  Metrics  `env:",prefix=METRICS_"`
 		Registry Registry `env:",prefix=REGISTRY_"`
 	}
-	// Registry carries process-wide identity, used as the `registry` label
-	// on all HTTP metrics. When Name is empty at load time, the DI layer
-	// falls back to os.Hostname() (with an empty-string last resort if that
-	// lookup fails).
+	// Registry custom name, acts as identity, defaults to hostname.
 	Registry struct {
 		Name string `env:"NAME"`
 	}
