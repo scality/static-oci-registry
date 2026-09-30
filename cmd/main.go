@@ -47,7 +47,8 @@ func main() {
 	go startHTTPServer(ctx, httpLogger, httpServer, sigCh)
 
 	metricsServer := container.GetMetricsServer()
-	spawnMetricsGoroutines(ctx, logger, container, sigCh)
+	metricsLogger := logger.With(slog.String("component", "metrics"))
+	spawnMetricsGoroutines(ctx, metricsLogger, container, sigCh)
 
 	// wait for anything to signal server termination
 	<-sigCh
@@ -67,24 +68,23 @@ func spawnMetricsGoroutines(
 	container *di.Container,
 	sigCh chan<- os.Signal,
 ) {
-	metricsLogger := logger.With(slog.String("component", "metrics"))
 	metricsServer := container.GetMetricsServer()
 	metricsCertWatcher := container.GetMetricsCertWatcher()
 
 	switch {
 	case metricsServer == nil:
-		metricsLogger.InfoContext(ctx, "metrics http server is disabled",
+		logger.InfoContext(ctx, "metrics http server is disabled",
 			slog.String("reason", `METRICS_ADDR is "0"`),
 		)
 	case metricsCertWatcher == nil:
-		metricsLogger.WarnContext(ctx, "metrics http server is running without TLS",
+		logger.WarnContext(ctx, "metrics http server is running without TLS",
 			slog.String("reason", "METRICS_SECURE is false"),
 		)
 
-		go startHTTPServer(ctx, metricsLogger, metricsServer, sigCh)
+		go startHTTPServer(ctx, logger, metricsServer, sigCh)
 	default:
-		go startCertWatcher(ctx, metricsLogger, metricsCertWatcher, sigCh)
-		go startHTTPServer(ctx, metricsLogger, metricsServer, sigCh)
+		go startCertWatcher(ctx, logger, metricsCertWatcher, sigCh)
+		go startHTTPServer(ctx, logger, metricsServer, sigCh)
 	}
 }
 
@@ -176,6 +176,7 @@ func startHTTPServer(
 	} else {
 		serveErr = httpServer.ListenAndServe()
 	}
+
 	if serveErr != nil {
 		signalShutdown(sigCh)
 
