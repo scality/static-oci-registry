@@ -37,8 +37,7 @@ type Container struct {
 	metricsHandler     http.Handler
 	metricsTLSConfig   *tls.Config
 	metricsCertWatcher *certwatcher.CertWatcher
-	metricsRegistry    *prometheus.Registry
-	registryName       string
+	metricsRegistry *prometheus.Registry
 
 	listTagsHandler      *handler.ListTags
 	fetchManifestHandler *handler.FetchManifest

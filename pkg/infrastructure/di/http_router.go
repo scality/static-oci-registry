@@ -38,7 +38,7 @@ func (c *Container) getHTTPRouter() http.Handler {
 		httpRouter.Handle("/v2/", metricsmw.Wrap(
 			v2Router,
 			&domain.RegistryRequestMetrics,
-			c.getRegistryName(),
+			c.config.Registry.Name,
 		))
 
 		c.router = httpRouter

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"text/tabwriter"
 	"time"
@@ -71,6 +72,14 @@ func (cfg *Environment) Load(ctx context.Context) error {
 
 	if err != nil {
 		return errors.Wrap(err, errors.WithDetail("failed loading config"))
+	}
+
+	// Default registry name to hostname if not set
+	if cfg.Registry.Name == "" {
+		hostname, err := os.Hostname()
+		if err == nil {
+			cfg.Registry.Name = hostname
+		}
 	}
 
 	return nil

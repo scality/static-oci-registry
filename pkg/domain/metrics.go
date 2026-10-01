@@ -31,6 +31,8 @@ var requestDurationBuckets = []float64{
 
 // Common label set carried by both request vecs. Order is not significant to
 // Prometheus but the shared slice keeps counter and histogram in lockstep.
+// WARNING: These label names are mandatory by promhttp.InstrumentHandlerDuration.
+// Do not change these values without updating the histogram instrumentation.
 //
 //nolint:gochecknoglobals // fixed label schema is intentional
 var labels = []string{
@@ -42,6 +44,11 @@ var labels = []string{
 	LabelRegistry,
 }
 
+// Prometheus metrics types and factories are defined here as domain knowledge:
+// the shape of metrics (labels, buckets, names) is a domain concern independent
+// of the monitoring backend.
+// This is equivalent to the const definitions above.
+//
 // RequestMetrics groups the two vecs the HTTP middleware needs. Constructed
 // once at startup and shared for the process lifetime.
 type RequestMetrics struct {
