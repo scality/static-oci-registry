@@ -1,7 +1,7 @@
 // PullBlob is structurally similar to FetchManifestFromDigest but semantically
 // distinct: it streams blob bytes rather than returning a decoded manifest.
 //
-//nolint:dupl // see above
+// nolint:dupl // see above
 package usecase
 
 import (
