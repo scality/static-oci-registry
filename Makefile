@@ -60,8 +60,8 @@ testcert:
 		-out $(CERT_DIR)/server.crt
 	@echo
 	@echo "Generated test certificates in $(CERT_DIR), use:"
-	@echo "HTTP_TLS_CERT_FILE=$(CERT_DIR)/server.crt"
-	@echo "HTTP_TLS_KEY_FILE=$(CERT_DIR)/server.key"
+	@echo "HTTP_TLS_CERT_FILE_PATH=$(CERT_DIR)/server.crt"
+	@echo "HTTP_TLS_KEY_FILE_PATH=$(CERT_DIR)/server.key"
 	@echo
 
 .PHONY: clean
@@ -86,6 +86,10 @@ ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; 
 ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
   [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually (k8s.io/api replace has no tag)" >&2; exit 1; }; \
   printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
+
+.PHONY: lint ## Run golangci-lint
+lint:
+	golangci-lint run ./...
 
 .PHONY: unit-test
 unit-test:
