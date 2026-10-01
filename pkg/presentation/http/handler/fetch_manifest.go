@@ -72,10 +72,12 @@ func (h *FetchManifest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch ref := fetchManifestInput.Ref.(type) {
 	case domain.Tag:
 		fetchManifestOutput, err = h.fetchManifestFromTagUseCase.Execute(
-			ctx, fetchManifestInput.Name, ref)
+			ctx, fetchManifestInput.Name, ref,
+		)
 	case domain.Digest:
 		fetchManifestOutput, err = h.fetchManifestFromDigestUseCase.Execute(
-			ctx, fetchManifestInput.Name, ref)
+			ctx, fetchManifestInput.Name, ref,
+		)
 	default:
 		// Unreachable: parseFetchManifestRequest only produces Tag or Digest
 		// for FetchManifestInput.Ref. Any other type indicates a programming
@@ -111,7 +113,8 @@ func (h *FetchManifest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httplayer.RespondWithBytes(
-		ctx, w, fetchManifestOutput.ManifestBytes, headers, http.StatusOK, h.logger)
+		ctx, w, fetchManifestOutput.ManifestBytes, headers, http.StatusOK, h.logger,
+	)
 }
 
 // nolint:funlen,gocognit // this function is long and complex because of all the
