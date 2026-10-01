@@ -53,7 +53,7 @@ func (c *Container) newCertWatcher(label, certPath, keyPath string) *certwatcher
 		os.Exit(1) //nolint:revive // Fatal-equivalent for DI initialization failure
 	}
 
-	watcher, err := certwatcher.New(c.GetLogger(), certPath, keyPath)
+	watcher, err := certwatcher.New(logger, certPath, keyPath)
 	if err != nil {
 		logger.ErrorContext(c.ctx, "failed to create TLS certificate watcher",
 			slog.Any("error", err),
