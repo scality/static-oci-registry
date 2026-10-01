@@ -11,15 +11,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 )
 
-// wrapMetricsHandlerWithAuth returns next wrapped with the kubebuilder-style
-// authn/authz filter: bearer tokens are validated via TokenReview and callers
-// must be authorized (via SubjectAccessReview) to `get` the non-resource URL
-// `/metrics`. This is the same filter modern kubebuilder projects scaffold.
-//
-// The filter is only applied when METRICS_SECURE=true, so bearer tokens are
-// never accepted over an unencrypted listener. A failure to construct the
-// filter (bad kubeconfig, unreachable apiserver at startup, missing RBAC on
-// the app's own ServiceAccount) is treated as fatal.
+// wrapMetricsHandlerWithAuth guards /metrics access with Kubernetes auth.
+// Validates bearer tokens and checks permissions via Kubernetes APIs (TokenReview, SubjectAccessReview).
+// Applied only when METRICS_SECURE=true; startup failures are fatal.
 func (c *Container) wrapMetricsHandlerWithAuth(next http.Handler) http.Handler {
 	restConfig, err := c.getMetricsRESTConfig()
 	if err != nil {
@@ -29,12 +23,8 @@ func (c *Container) wrapMetricsHandlerWithAuth(next http.Handler) http.Handler {
 		os.Exit(1) //nolint:revive // startup misconfiguration is fatal
 	}
 
-	// Build the http client from restConfig so its transport honours the
-	// kubeconfig's TLS settings (CAData / CAFile). Passing nil here would let
-	// client-go fall back to http.DefaultClient, which uses the system trust
-	// store and drops the pod / kubeconfig CA on the floor — TokenReview and
-	// SubjectAccessReview calls would then fail the TLS handshake and the
-	// filter would map that transport error to HTTP 500 for every request.
+	// Must build from restConfig, not DefaultClient.
+	// DefaultClient loses the kubeconfig's TLS CA, breaking TokenReview/SubjectAccessReview auth.
 	httpClient, err := rest.HTTPClientFor(restConfig)
 	if err != nil {
 		c.GetLogger().ErrorContext(c.ctx, "failed to build kubernetes http client for metrics auth",
@@ -62,9 +52,8 @@ func (c *Container) wrapMetricsHandlerWithAuth(next http.Handler) http.Handler {
 	return authHandler
 }
 
-// getMetricsRESTConfig returns a *rest.Config for the metrics auth filter.
-// When METRICS_KUBECONFIG is set, it is loaded from that path (useful for
-// local development). Otherwise the in-cluster config is used.
+// getMetricsRESTConfig loads Kubernetes config: tries METRICS_KUBECONFIG first, falls back to in-cluster config.
+// Useful for local development.
 func (c *Container) getMetricsRESTConfig() (*rest.Config, error) {
 	if path := c.config.Metrics.Kubeconfig; path != "" {
 		return clientcmd.BuildConfigFromFlags("", path) //nolint:wrapcheck // returned to a fatal callsite

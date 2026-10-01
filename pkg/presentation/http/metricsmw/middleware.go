@@ -1,8 +1,5 @@
-// Package metricsmw wraps an http.Handler with a request-scoped label bag and
-// the two Prometheus vecs defined in request_metrics.go. It composes promhttp's
-// counter and duration instrumenters so status-code and method labels are
-// captured automatically, and reads the endpoint/solution labels from the
-// reqlabels bag at end-of-request via WithLabelFromCtx.
+// Package metricsmw wires the HTTP handlers with Prometheus middlewares.
+// Composes request counters and latency histograms, populated with endpoint/solution labels.
 package metricsmw
 
 import (
@@ -16,15 +13,8 @@ import (
 	"github.com/scality/static-oci-registry/pkg/presentation/http/reqlabels"
 )
 
-// Wrap returns next wrapped with:
-//  1. A request-scoped reqlabels.RequestLabels bag installed on the request
-//     context so the router and handlers can mutate endpoint/solution labels.
-//  2. promhttp.InstrumentHandlerCounter and InstrumentHandlerDuration reading
-//     the bag via WithLabelFromCtx to observe the request when it completes.
-//
-// The `registry` label is curried into the vecs at construction so the fully
-// labelled child vec is fixed for the lifetime of the process and no dynamic
-// registry-value plumbing is needed.
+// Wrap `next` with request metrics.
+// The label bag is installed on the request context for handlers to populate with endpoint/solution labels.
 func Wrap(next http.Handler, m *domain.RequestMetrics, registry string) http.Handler {
 	registryLabels := prometheus.Labels{domain.LabelRegistry: registry}
 
