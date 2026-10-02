@@ -8,7 +8,13 @@ import (
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
+	"github.com/scality/static-oci-registry/pkg/presentation/http/reqlabels"
 )
+
+// endpointVersionCheck is the metric label for the OCI version-check endpoint
+// (end-1 of the distribution spec), served inline by the router rather than
+// by a dedicated Route.
+const endpointVersionCheck = "version_check"
 
 // Route is an HTTP handler that knows which paths it can serve and which
 // methods are valid on those paths.
@@ -21,6 +27,11 @@ type Route interface {
 	// advertise every method they handle (e.g. GET implies HEAD only if
 	// the handler actually implements it).
 	AllowedMethods() []string
+	// EndpointName returns the OCI-spec label of this route, used as the
+	// value of the `endpoint` HTTP metric label (for example "list_tags",
+	// "fetch_manifest", "pull_blob", "unsupported"). Kept short and stable
+	// because it becomes part of the Prometheus series identity.
+	EndpointName() string
 }
 
 // NewV2Router returns the dispatcher for the OCI /v2/ surface. It serves the
@@ -29,12 +40,21 @@ type Route interface {
 // but not the method, it returns an OCI error envelope using the UNSUPPORTED
 // code via HandleError (404). If no route matches, it returns 404.
 // Routes are evaluated in registration order.
+//
+// The router also records the matched route's EndpointName() on the
+// reqlabels.RequestLabels bag carried in the request context so downstream
+// HTTP metrics can label observations. Unknown paths leave the endpoint
+// empty; the metrics middleware surfaces that as "unknown" to keep the
+// series cardinality bounded. The version-check branch sets it to
+// "version_check".
 func NewV2Router(logger *slog.Logger, routes ...Route) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
+		labels := reqlabels.From(r.Context())
 
 		// end-1: OCI version check
 		if path == "/v2/" {
+			labels.SetEndpoint(endpointVersionCheck)
 			w.WriteHeader(http.StatusOK)
 
 			return
@@ -44,6 +64,8 @@ func NewV2Router(logger *slog.Logger, routes ...Route) http.Handler {
 			if !route.Matches(path) {
 				continue
 			}
+
+			labels.SetEndpoint(route.EndpointName())
 
 			if !slices.Contains(route.AllowedMethods(), r.Method) {
 				// this will return 404 instead of 405, which is intentional

@@ -39,15 +39,17 @@ var _ = Describe("Pull Blob", func() {
 
 				layoutA := mocks.NewMockLayout(GinkgoT())
 				layoutA.EXPECT().OpenBlob(mock.Anything, dgst).Return(blobReader(blobContent), nil)
+				layoutA.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
-				rc, err := puller.PullBlob(context.Background(), image, dgst)
+				out, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(rc).NotTo(BeNil())
+				Expect(out).NotTo(BeNil())
+				Expect(out.SolutionVersion).To(Equal(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}))
 
-				defer rc.Close()
+				defer out.Body.Close()
 
-				got, err := io.ReadAll(rc)
+				got, err := io.ReadAll(out.Body)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(got).To(Equal(blobContent))
 			})
@@ -63,16 +65,18 @@ var _ = Describe("Pull Blob", func() {
 
 				layoutB := mocks.NewMockLayout(GinkgoT())
 				layoutB.EXPECT().OpenBlob(mock.Anything, dgst).Return(blobReader(blobContent), nil)
+				layoutB.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "2.0.0"})
 
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
-				rc, err := puller.PullBlob(context.Background(), image, dgst)
+				out, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(rc).NotTo(BeNil())
+				Expect(out).NotTo(BeNil())
+				Expect(out.SolutionVersion).To(Equal(domain.SolutionVersion{Solution: "sol", Version: "2.0.0"}))
 
-				defer rc.Close()
+				defer out.Body.Close()
 
-				got, err := io.ReadAll(rc)
+				got, err := io.ReadAll(out.Body)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(got).To(Equal(blobContent))
 			})
@@ -89,16 +93,17 @@ var _ = Describe("Pull Blob", func() {
 
 				layoutB := mocks.NewMockLayout(GinkgoT())
 				layoutB.EXPECT().OpenBlob(mock.Anything, dgst).Return(blobReader(blobContent), nil)
+				layoutB.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
-				rc, err := puller.PullBlob(context.Background(), image, dgst)
+				out, err := puller.PullBlob(context.Background(), image, dgst)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(rc).NotTo(BeNil())
+				Expect(out).NotTo(BeNil())
 
-				defer rc.Close()
+				defer out.Body.Close()
 
-				got, err := io.ReadAll(rc)
+				got, err := io.ReadAll(out.Body)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(got).To(Equal(blobContent))
 			})

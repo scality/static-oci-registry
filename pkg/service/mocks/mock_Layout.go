@@ -287,6 +287,50 @@ func (_c *MockLayout_ResolveTag_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// SolutionVersion provides a mock function for the type MockLayout
+func (_mock *MockLayout) SolutionVersion() domain.SolutionVersion {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for SolutionVersion")
+	}
+
+	var r0 domain.SolutionVersion
+	if returnFunc, ok := ret.Get(0).(func() domain.SolutionVersion); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(domain.SolutionVersion)
+	}
+	return r0
+}
+
+// MockLayout_SolutionVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SolutionVersion'
+type MockLayout_SolutionVersion_Call struct {
+	*mock.Call
+}
+
+// SolutionVersion is a helper method to define mock.On call
+func (_e *MockLayout_Expecter) SolutionVersion() *MockLayout_SolutionVersion_Call {
+	return &MockLayout_SolutionVersion_Call{Call: _e.mock.On("SolutionVersion")}
+}
+
+func (_c *MockLayout_SolutionVersion_Call) Run(run func()) *MockLayout_SolutionVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockLayout_SolutionVersion_Call) Return(solutionVersion domain.SolutionVersion) *MockLayout_SolutionVersion_Call {
+	_c.Call.Return(solutionVersion)
+	return _c
+}
+
+func (_c *MockLayout_SolutionVersion_Call) RunAndReturn(run func() domain.SolutionVersion) *MockLayout_SolutionVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Tags provides a mock function for the type MockLayout
 func (_mock *MockLayout) Tags(ctx context.Context) ([]domain.Tag, error) {
 	ret := _mock.Called(ctx)

@@ -48,11 +48,54 @@ it extensible for other kinds of content sources.
 > versions, images, and tags can be added or removed without restarting the server.
 
 > [!NOTE]
-> **TLS certificate renewal.** The server is served over mandatory TLS, and the
-> certificate and key files are watched on disk (`pkg/infrastructure/certwatcher`).
-> The `tls.Config` resolves the certificate per-handshake via `GetCertificate`, so
-> renewed certificates are picked up **without restarting the server**. Reloads are
-> triggered by `fsnotify` filesystem events with a periodic re-read as a safety net,
-> and the watcher re-establishes its watch after atomic swaps (e.g. Kubernetes secret
+> **TLS certificate renewal.** The OCI listener is served over mandatory TLS;
+> the metrics listener is served over TLS by default and can be switched to
+> plain HTTP via `METRICS_SECURE=false`. Each TLS listener has its own
+> independent certificate/key pair, watched on disk
+> (`pkg/infrastructure/certwatcher`). The `tls.Config` resolves the certificate
+> per-handshake via `GetCertificate`, so renewed certificates are picked up
+> **without restarting the server**. Reloads are triggered by `fsnotify`
+> filesystem events with a periodic re-read as a safety net, and the watcher
+> re-establishes its watch after atomic swaps (e.g. Kubernetes secret
 > rotations). It is a lightweight, dependency-free replacement for
 > `sigs.k8s.io/controller-runtime/pkg/certwatcher`.
+
+> [!NOTE]
+> **HTTP metrics.** The `/v2/` subtree is wrapped by a middleware
+> (`pkg/presentation/http/metricsmw`) that composes `promhttp`'s counter and
+> duration instrumenters. Endpoint and solution labels are carried through the
+> request via a mutable bag (`pkg/presentation/http/reqlabels`) installed on
+> the request context: the router sets `Endpoint` on route match, and the
+> `FetchManifest` / `PullBlob` handlers write `SolutionName`/`SolutionVersion`
+> after the usecase returns. `service.Layout` exposes `SolutionVersion()` so
+> infrastructure adapters can populate the winning `(solution, version)` tuple
+> on their outputs without string-parsing the layout path. The `registry`
+> label is resolved once at startup from `REGISTRY_NAME`
+> (`os.Hostname()` fallback) and curried into the vecs.
+
+> [!NOTE]
+> **Metrics scrape auth.** When `METRICS_SECURE=true`, the `/metrics` handler
+> is wrapped with `controller-runtime`'s
+> `filters.WithAuthenticationAndAuthorization`: bearer tokens are validated
+> via `TokenReview` and the caller must be authorized (via
+> `SubjectAccessReview`) to `get` the non-resource URL `/metrics`. This is the
+> same middleware modern kubebuilder projects scaffold. The Kubernetes REST
+> config is resolved in-cluster by default; `METRICS_KUBECONFIG` overrides it
+> for local development. Auth is only applied when TLS is enabled so bearer
+> tokens are never accepted over plaintext.
+
+> [!NOTE]
+> **Testing tiers for metrics.** The metrics surface has three tiers of
+> coverage: colocated stdlib `_test.go` files under `pkg/` for pure logic
+> (label bags, middleware wiring, endpoint names, kubeconfig loading); a
+> Ginkgo integration suite in `test/integration/` that boots the real HTTPS
+> server plus a plain-HTTP metrics listener on an ephemeral port and asserts
+> scrape output over the wire (endpoint plumbing, RED counter and histogram
+> values, error labels, route exclusion); and a Ginkgo kube suite in
+> `test/kube/` that exercises the auth filter against a real `kube-apiserver`
+> + `etcd` spawned locally by `sigs.k8s.io/controller-runtime/pkg/envtest`.
+> The kube suite provisions bearer tokens via `--token-auth-file`, installs
+> `nonResourceURLs: [/metrics] verbs: [get]` RBAC for a scraper user, and
+> asserts real `TokenReview` + `SubjectAccessReview` outcomes. Local runs
+> and CI both resolve `KUBEBUILDER_ASSETS` via `setup-envtest`; CI caches
+> the ~160 MB binary set keyed on the target Kubernetes version.

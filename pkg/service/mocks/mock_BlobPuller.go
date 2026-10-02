@@ -6,7 +6,6 @@ package mocks
 
 import (
 	"context"
-	"io"
 
 	"github.com/scality/static-oci-registry/pkg/domain"
 	mock "github.com/stretchr/testify/mock"
@@ -40,23 +39,23 @@ func (_m *MockBlobPuller) EXPECT() *MockBlobPuller_Expecter {
 }
 
 // PullBlob provides a mock function for the type MockBlobPuller
-func (_mock *MockBlobPuller) PullBlob(ctx context.Context, imageName domain.ImageName, digest domain.Digest) (io.ReadSeekCloser, error) {
+func (_mock *MockBlobPuller) PullBlob(ctx context.Context, imageName domain.ImageName, digest domain.Digest) (*domain.PullBlobOutput, error) {
 	ret := _mock.Called(ctx, imageName, digest)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PullBlob")
 	}
 
-	var r0 io.ReadSeekCloser
+	var r0 *domain.PullBlobOutput
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.ImageName, domain.Digest) (io.ReadSeekCloser, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.ImageName, domain.Digest) (*domain.PullBlobOutput, error)); ok {
 		return returnFunc(ctx, imageName, digest)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.ImageName, domain.Digest) io.ReadSeekCloser); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.ImageName, domain.Digest) *domain.PullBlobOutput); ok {
 		r0 = returnFunc(ctx, imageName, digest)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(io.ReadSeekCloser)
+			r0 = ret.Get(0).(*domain.PullBlobOutput)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.ImageName, domain.Digest) error); ok {
@@ -103,12 +102,12 @@ func (_c *MockBlobPuller_PullBlob_Call) Run(run func(ctx context.Context, imageN
 	return _c
 }
 
-func (_c *MockBlobPuller_PullBlob_Call) Return(readSeekCloser io.ReadSeekCloser, err error) *MockBlobPuller_PullBlob_Call {
-	_c.Call.Return(readSeekCloser, err)
+func (_c *MockBlobPuller_PullBlob_Call) Return(pullBlobOutput *domain.PullBlobOutput, err error) *MockBlobPuller_PullBlob_Call {
+	_c.Call.Return(pullBlobOutput, err)
 	return _c
 }
 
-func (_c *MockBlobPuller_PullBlob_Call) RunAndReturn(run func(ctx context.Context, imageName domain.ImageName, digest domain.Digest) (io.ReadSeekCloser, error)) *MockBlobPuller_PullBlob_Call {
+func (_c *MockBlobPuller_PullBlob_Call) RunAndReturn(run func(ctx context.Context, imageName domain.ImageName, digest domain.Digest) (*domain.PullBlobOutput, error)) *MockBlobPuller_PullBlob_Call {
 	_c.Call.Return(run)
 	return _c
 }

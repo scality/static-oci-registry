@@ -55,6 +55,7 @@ jobs:
             -e FS_ROOT=/data/fs \
             -e HTTP_TLS_CERT_FILE_PATH=/data/certs/server.crt \
             -e HTTP_TLS_KEY_FILE_PATH=/data/certs/server.key \
+            -e METRICS_ADDR=0 \
             -p 5000:5000 \
             ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
 

@@ -48,6 +48,8 @@ func (fs *FileSystem) FetchManifest(
 			continue
 		}
 
+		out.SolutionVersion = layout.SolutionVersion()
+
 		return out, nil
 	}
 
