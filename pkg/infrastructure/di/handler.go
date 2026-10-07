@@ -1,6 +1,11 @@
 package di
 
-import "github.com/scality/static-oci-registry/pkg/presentation/http/handler"
+import (
+	"net/http"
+
+	"github.com/scality/static-oci-registry/pkg/presentation/http/handler"
+	"github.com/scality/static-oci-registry/pkg/presentation/metrics"
+)
 
 func (c *Container) getListTagsHandler() *handler.ListTags {
 	if c.listTagsHandler == nil {
@@ -36,4 +41,25 @@ func (c *Container) getUnsupportedHandler() *handler.UnsupportedEndpoint {
 	}
 
 	return c.unsupportedHandler
+}
+
+func (c *Container) getMetricsHandler() http.Handler {
+	if c.metricsHandler == nil {
+		h := metrics.NewHandler(
+			c.GetLogger(),
+			c.getMetricsRegistry(),
+		)
+
+		if c.config.Metrics.Secure {
+			h = c.wrapMetricsHandlerWithAuth(h)
+		}
+
+		// Mount only on /metrics path; other paths return 404
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", h)
+
+		c.metricsHandler = mux
+	}
+
+	return c.metricsHandler
 }

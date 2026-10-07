@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/scality/static-oci-registry/cmd/config"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/blobpuller"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/certwatcher"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/digestmanifestfetcher"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/layoutwalker"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/metrics"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/taglister"
 	"github.com/scality/static-oci-registry/pkg/infrastructure/tagmanifestfetcher"
 	"github.com/scality/static-oci-registry/pkg/presentation/http/handler"
@@ -27,10 +29,17 @@ type Container struct {
 
 	logger *slog.Logger
 
-	TLSConfig   *tls.Config
-	certWatcher *certwatcher.CertWatcher
-	router      http.Handler
-	httpServer  *http.Server
+	TLSConfig       *tls.Config
+	router          http.Handler
+	httpCertWatcher *certwatcher.CertWatcher
+	httpServer      *http.Server
+
+	metricsServer      *http.Server
+	metricsHandler     http.Handler
+	metricsTLSConfig   *tls.Config
+	metricsCertWatcher *certwatcher.CertWatcher
+	metricsRegistry    *prometheus.Registry
+	requestMetrics     *metrics.RequestMetrics
 
 	listTagsHandler      *handler.ListTags
 	fetchManifestHandler *handler.FetchManifest
