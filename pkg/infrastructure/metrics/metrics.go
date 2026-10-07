@@ -3,6 +3,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/scality/static-oci-registry/pkg/domain"
+	"github.com/scality/static-oci-registry/pkg/presentation/http/metricsmw"
 )
 
 // RequestMetrics groups the two vecs the HTTP middleware needs. Constructed
@@ -14,6 +15,18 @@ type RequestMetrics struct {
 	Requests *prometheus.CounterVec
 	Duration *prometheus.HistogramVec
 }
+
+// GetRequestCounter implements metricsmw.MetricsCollector.
+func (m *RequestMetrics) GetRequestCounter() *prometheus.CounterVec {
+	return m.Requests
+}
+
+// GetDurationHistogram implements metricsmw.MetricsCollector.
+func (m *RequestMetrics) GetDurationHistogram() *prometheus.HistogramVec {
+	return m.Duration
+}
+
+var _ metricsmw.MetricsCollector = (*RequestMetrics)(nil)
 
 // NewRequestsCounter builds a fresh, unregistered requests_total counter vec
 // carrying the standard label set. Callers own registration.

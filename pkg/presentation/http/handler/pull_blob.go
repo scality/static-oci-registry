@@ -10,6 +10,7 @@ import (
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
 	httplayer "github.com/scality/static-oci-registry/pkg/presentation/http"
+	"github.com/scality/static-oci-registry/pkg/presentation/http/reqlabels"
 	"github.com/scality/static-oci-registry/pkg/usecase"
 )
 
@@ -48,6 +49,12 @@ func (*PullBlob) AllowedMethods() []string {
 	return []string{http.MethodGet, http.MethodHead}
 }
 
+// EndpointName returns the OCI-spec label of this route, used as the
+// `endpoint` HTTP metric label.
+func (*PullBlob) EndpointName() string {
+	return "pull_blob"
+}
+
 func (h *PullBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -57,13 +64,18 @@ func (h *PullBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, err := h.pullBlobUseCase.Execute(ctx, pullBlobInput.ImageName, pullBlobInput.Digest)
+	out, err := h.pullBlobUseCase.Execute(ctx, pullBlobInput.ImageName, pullBlobInput.Digest)
 	if err != nil {
 		httplayer.HandleError(ctx, w, err, h.logger)
 		return
 	}
 
-	defer rc.Close()
+	defer out.Body.Close()
+
+	// Record which (solution, version) served the request so HTTP metrics
+	// can label the observation. Safe to call even if no metrics middleware
+	// installed the bag.
+	reqlabels.From(ctx).SetSolution(out.SolutionVersion)
 
 	// must set Content-Type to a generic octet-stream as blobs are opaque to
 	// the registry, and must contain the digest of the body in the
@@ -77,7 +89,7 @@ func (h *PullBlob) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// name and zero modtime disable filename-based content sniffing and the
 	// Last-Modified header respectively, both of which are meaningless for a
 	// content-addressed blob.
-	http.ServeContent(w, r, "", time.Time{}, rc)
+	http.ServeContent(w, r, "", time.Time{}, out.Body)
 }
 
 // parses a query and returns the input type for the PullBlob usecase.

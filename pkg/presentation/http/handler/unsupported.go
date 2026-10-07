@@ -34,6 +34,14 @@ func (*UnsupportedEndpoint) AllowedMethods() []string {
 	return nil
 }
 
+// EndpointName returns the OCI-spec label of this route, used as the
+// `endpoint` HTTP metric label. All push-surface endpoints (end-4..7,
+// end-9..11) collapse under this single label because we reject them all
+// with the same UNSUPPORTED code.
+func (*UnsupportedEndpoint) EndpointName() string {
+	return "unsupported"
+}
+
 // ServeHTTP is unreachable through the /v2/ dispatcher (the method check
 // rejects every request before reaching here). It returns 405 as a
 // fail-safe if the route is wired up directly.

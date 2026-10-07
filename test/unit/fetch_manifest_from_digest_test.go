@@ -42,6 +42,7 @@ var _ = Describe("Fetch Manifest From Digest", func() {
 					ContentDigest: dgst,
 					ManifestBytes: []byte(validManifestJSON),
 				}, nil)
+				layoutA.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
@@ -50,6 +51,7 @@ var _ = Describe("Fetch Manifest From Digest", func() {
 				Expect(out.MediaType).To(Equal(domain.MediaTypeOCIImageManifest))
 				Expect(out.ContentDigest).To(Equal(dgst))
 				Expect(out.ManifestBytes).To(BeEquivalentTo([]byte(validManifestJSON)))
+				Expect(out.SolutionVersion).To(Equal(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}))
 			})
 		})
 
@@ -64,6 +66,7 @@ var _ = Describe("Fetch Manifest From Digest", func() {
 					ContentDigest: dgst,
 					ManifestBytes: indexBytes,
 				}, nil)
+				layoutA.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, dgst)
@@ -88,6 +91,7 @@ var _ = Describe("Fetch Manifest From Digest", func() {
 					ContentDigest: dgst,
 					ManifestBytes: []byte(validManifestJSON),
 				}, nil)
+				layoutB.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "2.0.0"})
 
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
@@ -95,6 +99,7 @@ var _ = Describe("Fetch Manifest From Digest", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(out).NotTo(BeNil())
 				Expect(out.ContentDigest).To(Equal(dgst))
+				Expect(out.SolutionVersion).To(Equal(domain.SolutionVersion{Solution: "sol", Version: "2.0.0"}))
 			})
 		})
 	})
@@ -170,6 +175,7 @@ var _ = Describe("Fetch Manifest From Digest", func() {
 					ContentDigest: dgst,
 					ManifestBytes: []byte(validManifestJSON),
 				}, nil)
+				layoutB.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 

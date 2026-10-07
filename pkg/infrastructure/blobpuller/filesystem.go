@@ -2,7 +2,6 @@ package blobpuller
 
 import (
 	"context"
-	"io"
 	"log/slog"
 
 	"github.com/scality/go-errors"
@@ -27,7 +26,7 @@ func NewFileSystem(logger *slog.Logger, layoutWalker service.LayoutWalker) (*Fil
 
 func (fs *FileSystem) PullBlob(
 	ctx context.Context, imageName domain.ImageName, digest domain.Digest,
-) (io.ReadSeekCloser, error) {
+) (*domain.PullBlobOutput, error) {
 	l := fs.logger.With(
 		slog.String("image_name", string(imageName)),
 		slog.String("digest", string(digest)),
@@ -52,7 +51,7 @@ func (fs *FileSystem) PullBlob(
 			continue
 		}
 
-		return rc, nil
+		return &domain.PullBlobOutput{Body: rc, SolutionVersion: layout.SolutionVersion()}, nil
 	}
 
 	return nil, errors.Wrap(

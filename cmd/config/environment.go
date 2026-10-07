@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"reflect"
 	"text/tabwriter"
@@ -79,10 +78,10 @@ func (cfg *Environment) Load(ctx context.Context) error {
 	if cfg.Registry.Name == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			slog.Error("failed to get hostname for registry name", slog.Any("error", err))
-		} else {
-			cfg.Registry.Name = hostname
+			return errors.Wrap(err, errors.WithDetail("failed to get hostname for registry name"))
 		}
+
+		cfg.Registry.Name = hostname
 	}
 
 	return nil

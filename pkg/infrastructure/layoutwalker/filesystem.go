@@ -5,7 +5,6 @@ import (
 	"iter"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
@@ -48,8 +47,7 @@ func (fs *FileSystem) WalkLayouts(
 		}
 
 		for _, sv := range candidates {
-			path := strings.Join([]string{sv.Solution, sv.Version, imageName.String()}, "/")
-			if !yield(ocilayout.NewLayout(fs.logger, fs.root, path), nil) {
+			if !yield(ocilayout.NewLayout(fs.logger, fs.root, sv, imageName), nil) {
 				return
 			}
 		}

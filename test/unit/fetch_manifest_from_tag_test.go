@@ -45,6 +45,7 @@ var _ = Describe("Fetch Manifest From Tag", func() {
 					ContentDigest: someDigest,
 					ManifestBytes: manifestBytes,
 				}, nil)
+				layoutA.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, tag)
@@ -53,6 +54,7 @@ var _ = Describe("Fetch Manifest From Tag", func() {
 				Expect(out.MediaType).To(Equal(domain.MediaTypeOCIImageManifest))
 				Expect(out.ContentDigest).To(Equal(someDigest))
 				Expect(out.ManifestBytes).To(BeEquivalentTo(manifestBytes))
+				Expect(out.SolutionVersion).To(Equal(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}))
 			})
 		})
 
@@ -67,6 +69,7 @@ var _ = Describe("Fetch Manifest From Tag", func() {
 					ContentDigest: someDigest,
 					ManifestBytes: manifestBytes,
 				}, nil)
+				layoutB.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "2.0.0"})
 
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
@@ -74,6 +77,7 @@ var _ = Describe("Fetch Manifest From Tag", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(out).NotTo(BeNil())
 				Expect(out.ContentDigest).To(Equal(someDigest))
+				Expect(out.SolutionVersion).To(Equal(domain.SolutionVersion{Solution: "sol", Version: "2.0.0"}))
 			})
 		})
 
@@ -88,6 +92,7 @@ var _ = Describe("Fetch Manifest From Tag", func() {
 					ContentDigest: indexDigest,
 					ManifestBytes: indexBytes,
 				}, nil)
+				layoutA.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA))
 
 				out, err := fetcher.FetchManifest(context.Background(), image, tag)
@@ -150,6 +155,7 @@ var _ = Describe("Fetch Manifest From Tag", func() {
 					ContentDigest: someDigest,
 					ManifestBytes: manifestBytes,
 				}, nil)
+				layoutB.EXPECT().SolutionVersion().Return(domain.SolutionVersion{Solution: "sol", Version: "1.0.0"})
 
 				mockWalker.EXPECT().WalkLayouts(mock.Anything, image).Return(layoutSeq(layoutA, layoutB))
 
