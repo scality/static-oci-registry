@@ -81,21 +81,38 @@ Images can be produced with
 modified while the server runs - solutions, versions, images and tags are read on demand on
 each request, so additions and removals take effect without a restart.
 
+## Metrics
+
+The metrics endpoint, when enabled, exposes (labelled by `method`, `code`, `endpoint`,
+`solution_name`, `solution_version`, `registry`):
+
+- `registry_http_requests_total` — counter of served OCI requests
+- `registry_http_request_duration_seconds` — histogram of request durations
+
 ## Environment variables
 
 This service can be configured through environment variables:
 
-| Variable                | Behaviour                                                         |
-| ----------------------- | ----------------------------------------------------------------- |
-| LOG_LEVEL               | Sets the log level for the service                                |
-| HTTP_ADDR               | Sets the address the service listens and serves HTTP requests on  |
-| FS_ROOT                 | Sets the path to the root filesystem that the registry reads from |
-| HTTP_TLS_CERT_FILE_PATH | Path to the TLS certificate file (PEM). **Required.**            |
-| HTTP_TLS_KEY_FILE_PATH  | Path to the TLS private key file (PEM). **Required.**            |
+| Variable                   | Behaviour                                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| LOG_LEVEL                  | Sets the log level for the service                                                                              |
+| HTTP_ADDR                  | Sets the address the OCI listener binds to                                                                      |
+| FS_ROOT                    | Sets the path to the root filesystem that the registry reads from                                               |
+| HTTP_TLS_CERT_FILE_PATH    | Path to the TLS certificate file (PEM) for the OCI listener. **Required.**                                      |
+| HTTP_TLS_KEY_FILE_PATH     | Path to the TLS private key file (PEM) for the OCI listener. **Required.**                                      |
+| METRICS_ADDR               | Sets the address the metrics listener binds to. Defaults to `0`, which disables the metrics endpoint. Set to a `host:port` (e.g. `:8443`) to enable |
+| METRICS_SECURE             | When `true` (default), the metrics listener uses TLS **and** requires kubebuilder-style authn/authz. Set to `false` for plain HTTP with no auth |
+| METRICS_TLS_CERT_FILE_PATH | Path to the TLS certificate file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
+| METRICS_TLS_KEY_FILE_PATH  | Path to the TLS private key file (PEM) for the metrics listener. Required when `METRICS_SECURE=true`            |
+| METRICS_KUBECONFIG         | Optional path to a kubeconfig used for metrics authN/authZ (TokenReview/SubjectAccessReview). Empty ⇒ in-cluster config. |
+| REGISTRY_NAME              | Value for the `registry` HTTP-metric label. Defaults to the container hostname                                  |
+
 
 > [!NOTE]
-> TLS is mandatory. The service will not start if `HTTP_TLS_CERT_FILE_PATH` or
-> `HTTP_TLS_KEY_FILE_PATH` are not set. TLS 1.2 is the minimum accepted version.
+> The OCI listener requires TLS: the service will not start without
+> `HTTP_TLS_CERT_FILE_PATH` and `HTTP_TLS_KEY_FILE_PATH`. The metrics listener
+> requires TLS unless `METRICS_SECURE=false`. TLS 1.2 is the minimum accepted
+> version on any TLS listener.
 
 ### TLS certificate renewal
 

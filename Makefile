@@ -60,8 +60,8 @@ testcert:
 		-out $(CERT_DIR)/server.crt
 	@echo
 	@echo "Generated test certificates in $(CERT_DIR), use:"
-	@echo "HTTP_TLS_CERT_FILE=$(CERT_DIR)/server.crt"
-	@echo "HTTP_TLS_KEY_FILE=$(CERT_DIR)/server.key"
+	@echo "HTTP_TLS_CERT_FILE_PATH=$(CERT_DIR)/server.crt"
+	@echo "HTTP_TLS_KEY_FILE_PATH=$(CERT_DIR)/server.key"
 	@echo
 
 .PHONY: clean
@@ -70,9 +70,41 @@ clean:
 
 JUNIT_REPORT_DIR ?= .
 
+## Tool Binaries
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p "$(LOCALBIN)"
+
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+
+#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
+ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
+  [ -n "$$v" ] || { echo "Set ENVTEST_VERSION manually (controller-runtime replace has no tag)" >&2; exit 1; }; \
+  printf '%s\n' "$$v" | sed -E 's/^v?([0-9]+)\.([0-9]+).*/release-\1.\2/')
+
+#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
+ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
+  [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually (k8s.io/api replace has no tag)" >&2; exit 1; }; \
+  printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
+
+# renovate: datasource=github-releases depName=golangci/golangci-lint
+GOLANGCI_LINT_VERSION ?= v2.12.2
+
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+
+.PHONY: golangci-lint
+golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
+$(GOLANGCI_LINT): $(LOCALBIN)
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+.PHONY: lint ## Run golangci-lint
+lint: golangci-lint
+	$(GOLANGCI_LINT) run ./...
+
 .PHONY: unit-test
 unit-test:
 	ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-unit.xml test/unit
+	go test ./pkg/...
 
 .PHONY: integration-test
 integration-test:
@@ -81,3 +113,40 @@ integration-test:
 .PHONY: e2e-test
 e2e-test:
 	ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-e2e.xml test/e2e
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
+
+.PHONY: setup-envtest ## Download the binaries required for ENVTEST in the local bin directory.
+setup-envtest: envtest
+	@echo "Setting up envtest binaries for Kubernetes version $(ENVTEST_K8S_VERSION)..."
+	@"$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path || { \
+		echo "Error: Failed to set up envtest binaries for version $(ENVTEST_K8S_VERSION)."; \
+		exit 1; \
+	}
+
+.PHONY: kube-test ## Run kube tests
+kube-test: setup-envtest
+	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" ginkgo --junit-report=$(JUNIT_REPORT_DIR)/junit-kube.xml test/kube
+
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+rm -f "$(1)" ;\
+GOBIN="$(LOCALBIN)" go install $${package} ;\
+mv "$(LOCALBIN)/$$(basename "$(1)")" "$(1)-$(3)" ;\
+} ;\
+ln -sf "$$(realpath "$(1)-$(3)")" "$(1)"
+endef
+
+define gomodver
+$(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' $(1) 2>/dev/null)
+endef

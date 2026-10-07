@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
+	"os"
 	"reflect"
 	"text/tabwriter"
 	"time"
@@ -24,9 +26,21 @@ const ApplicationName = "static-oci-registry"
 
 type (
 	Environment struct {
-		LogLevel string `env:"LOG_LEVEL, default=info"`
-		HTTP     HTTP   `env:",prefix=HTTP_"`
-		FS       FS     `env:",prefix=FS_"`
+		LogLevel string   `env:"LOG_LEVEL, default=info"`
+		HTTP     HTTP     `env:",prefix=HTTP_"`
+		FS       FS       `env:",prefix=FS_"`
+		Metrics  Metrics  `env:",prefix=METRICS_"`
+		Registry Registry `env:",prefix=REGISTRY_"`
+	}
+	// Registry custom name, acts as identity, defaults to hostname.
+	Registry struct {
+		Name string `env:"NAME"`
+	}
+	Metrics struct {
+		Addr       string `env:"ADDR, default=0"`
+		Secure     bool   `env:"SECURE, default=true"`
+		Kubeconfig string `env:"KUBECONFIG"`
+		TLS        TLS    `env:",prefix=TLS_"`
 	}
 	HTTP struct {
 		Addr string `env:"ADDR, default=:5000"`
@@ -59,6 +73,16 @@ func (cfg *Environment) Load(ctx context.Context) error {
 
 	if err != nil {
 		return errors.Wrap(err, errors.WithDetail("failed loading config"))
+	}
+
+	// Default registry name to hostname if not set
+	if cfg.Registry.Name == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			slog.Error("failed to get hostname for registry name", slog.Any("error", err))
+		} else {
+			cfg.Registry.Name = hostname
+		}
 	}
 
 	return nil
