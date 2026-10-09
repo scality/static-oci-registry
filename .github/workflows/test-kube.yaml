@@ -1,0 +1,34 @@
+name: Kube tests
+
+on:
+  workflow_call:
+
+jobs:
+  kube-test:
+    name: Run on Ubuntu
+    runs-on: ubuntu-24.04
+    steps:
+      - name: clone the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: set up go
+        uses: ./.github/actions/setup-go
+      - name: Run Tests
+        run: |
+          mkdir -p ${{ github.workspace }}/artifacts/kube-results
+          make kube-test JUNIT_REPORT_DIR=${{ github.workspace }}/artifacts/kube-results
+      - name: Generate HTML report
+        if: always()
+        run: |
+          python3 -m pip install junit2html --quiet
+          junit2html \
+            ${{ github.workspace }}/artifacts/kube-results/junit-kube.xml \
+            ${{ github.workspace }}/artifacts/kube-results/report.html
+      - name: Upload test results
+        if: always()
+        uses: scality/action-artifacts@b311c0a0d8017683148906bd3fbe0e681b115608 # 4.3.0
+        with:
+          method: upload
+          url: https://artifacts.scality.net
+          user: ${{ secrets.ARTIFACTS_USER }}
+          password: ${{ secrets.ARTIFACTS_PASSWORD }}
+          source: ${{ github.workspace }}/artifacts/

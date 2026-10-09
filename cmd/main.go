@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -41,24 +42,92 @@ func main() {
 
 	httpServer := container.GetHTTPServer()
 
-	go startCertWatcher(ctx, logger, container.GetCertWatcher(), sigCh)
-	go startHTTPServer(ctx, logger, httpServer, sigCh)
+	httpLogger := logger.With(slog.String("component", "http"))
+	go startCertWatcher(ctx, httpLogger, container.GetHTTPCertWatcher(), sigCh)
+	go startHTTPServer(ctx, httpLogger, httpServer, sigCh)
+
+	metricsServer := container.GetMetricsServer()
+	metricsLogger := logger.With(slog.String("component", "metrics"))
+	spawnMetricsGoroutines(ctx, metricsLogger, container, sigCh)
 
 	// wait for anything to signal server termination
 	<-sigCh
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
-	defer shutdownCancel()
-
-	err = httpServer.Shutdown(shutdownCtx)
-	if err != nil {
-		logger.ErrorContext(ctx, "Error shutting down http server",
-			slog.Any("error", err),
-		)
+	if shutdownServers(ctx, logger, httpServer, metricsServer) {
 		os.Exit(1)
 	}
 
 	logger.InfoContext(ctx, "service stopped")
+}
+
+// spawnMetricsGoroutines starts the metrics HTTP server and its cert watcher
+// when metrics are enabled, respecting METRICS_SECURE for the TLS toggle.
+func spawnMetricsGoroutines(
+	ctx context.Context,
+	logger *slog.Logger,
+	container *di.Container,
+	sigCh chan<- os.Signal,
+) {
+	metricsServer := container.GetMetricsServer()
+	metricsCertWatcher := container.GetMetricsCertWatcher()
+
+	switch {
+	case metricsServer == nil:
+		logger.InfoContext(ctx, "metrics http server is disabled",
+			slog.String("reason", `METRICS_ADDR is "0"`),
+		)
+	case metricsCertWatcher == nil:
+		logger.WarnContext(ctx, "metrics http server is running without TLS",
+			slog.String("reason", "METRICS_SECURE is false"),
+		)
+
+		go startHTTPServer(ctx, logger, metricsServer, sigCh)
+	default:
+		go startCertWatcher(ctx, logger, metricsCertWatcher, sigCh)
+		go startHTTPServer(ctx, logger, metricsServer, sigCh)
+	}
+}
+
+// shutdownServers drains both HTTP servers in parallel with a bounded timeout
+// and returns true when either server failed to close cleanly.
+func shutdownServers(
+	ctx context.Context,
+	logger *slog.Logger,
+	httpServer *http.Server,
+	metricsServer *http.Server,
+) bool {
+	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
+	defer shutdownCancel()
+
+	var (
+		wg         sync.WaitGroup
+		httpErr    error
+		metricsErr error
+	)
+
+	wg.Go(func() {
+		httpErr = httpServer.Shutdown(shutdownCtx)
+		if httpErr != nil {
+			logger.ErrorContext(ctx, "Error shutting down http server",
+				slog.Any("error", httpErr),
+			)
+		}
+	})
+
+	if metricsServer != nil {
+		wg.Go(func() {
+			metricsErr = metricsServer.Shutdown(shutdownCtx)
+			if metricsErr != nil {
+				logger.ErrorContext(ctx, "Error shutting down metrics server",
+					slog.Any("error", metricsErr),
+				)
+			}
+		})
+	}
+
+	wg.Wait()
+
+	return httpErr != nil || metricsErr != nil
 }
 
 // startCertWatcher runs the TLS certificate watcher, signalling shutdown if it
@@ -91,6 +160,8 @@ func signalShutdown(sigCh chan<- os.Signal) {
 }
 
 // startHTTPServer runs the HTTP server, signalling shutdown when it stops.
+// When the server's TLSConfig is nil the listener serves plain HTTP; otherwise
+// certificates are resolved per-handshake by the associated cert watcher.
 func startHTTPServer(
 	ctx context.Context,
 	logger *slog.Logger,
@@ -99,7 +170,13 @@ func startHTTPServer(
 ) {
 	logger.InfoContext(ctx, "http server starting")
 
-	serveErr := httpServer.ListenAndServeTLS("", "")
+	var serveErr error
+	if httpServer.TLSConfig != nil {
+		serveErr = httpServer.ListenAndServeTLS("", "")
+	} else {
+		serveErr = httpServer.ListenAndServe()
+	}
+
 	if serveErr != nil {
 		signalShutdown(sigCh)
 

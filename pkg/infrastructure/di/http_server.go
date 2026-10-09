@@ -19,3 +19,22 @@ func (c *Container) GetHTTPServer() *http.Server {
 
 	return c.httpServer
 }
+
+// GetMetricsServer returns the metrics HTTP server, or nil when the metrics
+// endpoint is disabled (METRICS_ADDR="0", kubebuilder convention).
+func (c *Container) GetMetricsServer() *http.Server {
+	if c.config.Metrics.Addr == "0" {
+		return nil
+	}
+
+	if c.metricsServer == nil {
+		c.metricsServer = &http.Server{
+			Addr:              c.config.Metrics.Addr,
+			Handler:           c.getMetricsHandler(),
+			ReadHeaderTimeout: timeoutDurationInSeconds * time.Second,
+			TLSConfig:         c.getMetricsTLSConfig(),
+		}
+	}
+
+	return c.metricsServer
+}

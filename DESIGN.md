@@ -48,11 +48,30 @@ it extensible for other kinds of content sources.
 > versions, images, and tags can be added or removed without restarting the server.
 
 > [!NOTE]
-> **TLS certificate renewal.** The server is served over mandatory TLS, and the
-> certificate and key files are watched on disk (`pkg/infrastructure/certwatcher`).
-> The `tls.Config` resolves the certificate per-handshake via `GetCertificate`, so
-> renewed certificates are picked up **without restarting the server**. Reloads are
-> triggered by `fsnotify` filesystem events with a periodic re-read as a safety net,
-> and the watcher re-establishes its watch after atomic swaps (e.g. Kubernetes secret
+> **TLS certificate renewal.** The OCI listener is served over mandatory TLS;
+> the metrics listener is served over TLS by default and can be switched to
+> plain HTTP via `METRICS_SECURE=false`. Each TLS listener has its own
+> independent certificate/key pair, watched on disk
+> (`pkg/infrastructure/certwatcher`). The `tls.Config` resolves the certificate
+> per-handshake via `GetCertificate`, so renewed certificates are picked up
+> **without restarting the server**. Reloads are triggered by `fsnotify`
+> filesystem events with a periodic re-read as a safety net, and the watcher
+> re-establishes its watch after atomic swaps (e.g. Kubernetes secret
 > rotations). It is a lightweight, dependency-free replacement for
 > `sigs.k8s.io/controller-runtime/pkg/certwatcher`.
+
+> [!NOTE]
+> **HTTP metrics.** Request metrics (RED: requests, duration) are collected on the
+> `/v2/` subtree via middleware, with labels for endpoint, solution name/version,
+> and registry identity. Endpoints are identified by route match; solutions and
+> versions are populated by the usecase handlers.
+
+> [!NOTE]
+> **Metrics scrape auth.** When `METRICS_SECURE=true`, the `/metrics` endpoint
+> is protected by Kubernetes RBAC (TokenReview + SubjectAccessReview). Auth is
+> only enforced over TLS; plaintext metrics are unauthenticated.
+
+> [!NOTE]
+> **Metrics testing.** Metrics are tested at three levels: unit tests for label
+> logic, integration tests for scrape output, and kube tests for auth/authz
+> against a real apiserver.

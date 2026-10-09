@@ -19,13 +19,17 @@ import (
 // --- shared synthetic OCI-layout test builder (used across reader tests) ---
 
 type layoutBuilder struct {
-	root     string // os.Root base (the FS root)
-	imageDir string // <solution>/<version>/<image> relative to root
+	root      string // os.Root base (the FS root)
+	sv        domain.SolutionVersion
+	imageName domain.ImageName
+	imageDir  string // <solution>/<version>/<image> relative to root
 }
 
-func newLayoutBuilder(t *testing.T, imageDir string) *layoutBuilder { //nolint:unparam // imageDir will vary across future tests
+func newLayoutBuilder(t *testing.T, sv domain.SolutionVersion, imageName domain.ImageName) *layoutBuilder { //nolint:unparam // imageName will vary across future tests
 	t.Helper()
 	root := t.TempDir()
+
+	imageDir := sv.Solution + "/" + sv.Version + "/" + imageName.String()
 
 	full := filepath.Join(root, filepath.FromSlash(imageDir))
 	if err := os.MkdirAll(filepath.Join(full, "blobs", "sha256"), 0o755); err != nil {
@@ -37,7 +41,7 @@ func newLayoutBuilder(t *testing.T, imageDir string) *layoutBuilder { //nolint:u
 		t.Fatal(err)
 	}
 
-	return &layoutBuilder{root: root, imageDir: imageDir}
+	return &layoutBuilder{root: root, sv: sv, imageName: imageName, imageDir: imageDir}
 }
 
 // putBlob writes content under blobs/sha256/<hex> and returns its digest.
@@ -94,7 +98,7 @@ func (b *layoutBuilder) layout(t *testing.T) *ocilayout.Layout {
 
 	t.Cleanup(func() { _ = osRoot.Close() })
 
-	return ocilayout.NewLayout(slog.New(slog.DiscardHandler), osRoot, b.imageDir)
+	return ocilayout.NewLayout(slog.New(slog.DiscardHandler), osRoot, b.sv, b.imageName)
 }
 
 // a tiny valid image manifest (config + one layer).
@@ -110,7 +114,7 @@ func imageManifest(config, layer domain.Digest) domain.Manifest {
 // --- Tags ---
 
 func TestLayoutTags(t *testing.T) {
-	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	b := newLayoutBuilder(t, domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}, "img")
 	cfg := b.putBlob(t, []byte("config"))
 	layer := b.putBlob(t, []byte("layer"))
 	mDigest, mSize := b.putJSON(t, imageManifest(cfg, layer))
@@ -141,7 +145,7 @@ func TestLayoutTags(t *testing.T) {
 }
 
 func TestLayoutResolveTag(t *testing.T) {
-	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	b := newLayoutBuilder(t, domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}, "img")
 	cfg := b.putBlob(t, []byte("config"))
 	layer := b.putBlob(t, []byte("layer"))
 	manifest := imageManifest(cfg, layer)
@@ -183,7 +187,7 @@ func TestLayoutResolveTag(t *testing.T) {
 }
 
 func TestLayoutReadManifestByDigest_MultiArch(t *testing.T) {
-	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	b := newLayoutBuilder(t, domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}, "img")
 
 	// two per-platform image manifests
 	cfgA := b.putBlob(t, []byte("configA"))
@@ -242,7 +246,7 @@ func TestLayoutReadManifestByDigest_MultiArch(t *testing.T) {
 func TestLayoutReachableCycleGuard(t *testing.T) {
 	// Content addressing makes true cycles impossible to construct, so assert
 	// that duplicate descriptors terminate and dedupe rather than loop.
-	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	b := newLayoutBuilder(t, domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}, "img")
 	cfg := b.putBlob(t, []byte("config"))
 	layer := b.putBlob(t, []byte("layer"))
 	m, size := b.putJSON(t, imageManifest(cfg, layer))
@@ -258,7 +262,7 @@ func TestLayoutReachableCycleGuard(t *testing.T) {
 }
 
 func TestLayoutOpenBlob(t *testing.T) {
-	b := newLayoutBuilder(t, "sol/1.0.0/img")
+	b := newLayoutBuilder(t, domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}, "img")
 	cfg := b.putBlob(t, []byte("config-bytes"))
 	layer := b.putBlob(t, []byte("layer-bytes"))
 	m, size := b.putJSON(t, imageManifest(cfg, layer))

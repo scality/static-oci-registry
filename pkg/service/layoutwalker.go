@@ -17,6 +17,11 @@ type Layout interface {
 	// <solution>/<version>/<image> path) for diagnostic logging.
 	Location() string
 
+	// SolutionVersion returns the (solution, version) tuple this layout was
+	// built from. It is used by callers that must surface the winning
+	// candidate to upstream layers (for example, HTTP metric labels).
+	SolutionVersion() domain.SolutionVersion
+
 	// Tags returns the tags advertised by this layout's index.json
 	// (org.opencontainers.image.ref.name annotations).
 	Tags(ctx context.Context) ([]domain.Tag, error)
