@@ -9,12 +9,12 @@ import (
 )
 
 // Layout is a request-scoped reader over a single image's OCI Image Layout
-// (one <solution>/<version>/<image> directory). Implementations read on demand
+// (one <solution>/<version>/images/<image> directory). Implementations read on demand
 // and MUST NOT cache across requests. A nil result with a nil error means
 // "not present in this layout" so callers can try the next candidate.
 type Layout interface {
 	// Location returns a human-readable identifier of this layout (its
-	// <solution>/<version>/<image> path) for diagnostic logging.
+	// <solution>/<version>/images/<image> path) for diagnostic logging.
 	Location() string
 
 	// SolutionVersion returns the (solution, version) tuple this layout was

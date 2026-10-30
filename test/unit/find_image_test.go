@@ -13,10 +13,14 @@ import (
 	"github.com/scality/static-oci-registry/pkg/infrastructure/imagefinder"
 )
 
-// makeLayoutDir turns <root>/<sol>/<ver>/<image> into a minimal OCI layout
-// (empty index.json is enough for the finder predicate).
+// makeLayoutDir turns <root>/<sol>/<ver>/images/<image> into a minimal OCI layout.
 func makeLayoutDir(root, sol, ver, image string) {
-	dir := filepath.Join(root, sol, ver, image)
+	writeMinimalLayout(filepath.Join(root, sol, ver, "images", image))
+}
+
+// writeMinimalLayout turns dir into a minimal OCI layout
+// (empty index.json is enough for the finder predicate).
+func writeMinimalLayout(dir string) {
 	Expect(os.MkdirAll(filepath.Join(dir, "blobs", "sha256"), utils.PermissionOK)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(dir, "oci-layout"),
 		[]byte(`{"imageLayoutVersion":"1.0.0"}`), 0o600)).To(Succeed())
@@ -195,9 +199,68 @@ var _ = Describe("Find Images OCI layout predicate", Ordered, func() {
 	When("an image directory is missing oci-layout/index.json", func() {
 		It("is not treated as an image", func() {
 			// create the dir but NOT the layout marker files
-			Expect(os.MkdirAll(filepath.Join(suite.FsRoot, "sol", "1.0.0", "img"), utils.PermissionOK)).To(Succeed())
+			Expect(os.MkdirAll(filepath.Join(suite.FsRoot, "sol", "1.0.0", "images", "img"), utils.PermissionOK)).To(Succeed())
 
 			_, err := imageFinder.FindImage(ctx, domain.ImageName("img"))
+
+			utils.ValidateError(err)
+			Expect(err).To(MatchError(domain.ErrImageNotFound))
+		})
+	})
+})
+
+var _ = Describe("Find Images images/ directory", Ordered, func() {
+	const (
+		solution                  = "images-dir-sol"
+		image    domain.ImageName = "docker.io/images-dir/test-image"
+	)
+
+	var (
+		imageFinder *imagefinder.FileSystem
+		ctx         = context.Background()
+	)
+
+	BeforeAll(func() {
+		var err error
+
+		imageFinder, err = imagefinder.NewFileSystem(suite.Logger, openRoot(suite.FsRoot))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(os.RemoveAll(filepath.Join(suite.FsRoot, solution))).To(Succeed())
+	})
+
+	When("a layout sits directly under the version directory", func() {
+		It("is not treated as an image", func() {
+			writeMinimalLayout(filepath.Join(suite.FsRoot, solution, "v1.0.0", string(image)))
+
+			_, err := imageFinder.FindImage(ctx, image)
+
+			utils.ValidateError(err)
+			Expect(err).To(MatchError(domain.ErrImageNotFound))
+		})
+	})
+
+	When("a newer version has no images directory", func() {
+		It("skips it and returns the older version", func() {
+			writeMinimalLayout(filepath.Join(suite.FsRoot, solution, "v2.0.0", string(image)))
+			makeLayoutDir(suite.FsRoot, solution, "v1.0.0", string(image))
+
+			found, err := imageFinder.FindImage(ctx, image)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(Equal([]domain.SolutionVersion{{Solution: solution, Version: "v1.0.0"}}))
+		})
+	})
+
+	When("images is a regular file", func() {
+		It("skips the candidate without an internal error", func() {
+			versionDir := filepath.Join(suite.FsRoot, solution, "v1.0.0")
+			Expect(os.MkdirAll(versionDir, utils.PermissionOK)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(versionDir, "images"), nil, 0o600)).To(Succeed())
+
+			_, err := imageFinder.FindImage(ctx, image)
 
 			utils.ValidateError(err)
 			Expect(err).To(MatchError(domain.ErrImageNotFound))
