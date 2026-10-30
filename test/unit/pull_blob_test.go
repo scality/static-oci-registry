@@ -89,7 +89,7 @@ var _ = Describe("Pull Blob", func() {
 
 				layoutA := mocks.NewMockLayout(GinkgoT())
 				layoutA.EXPECT().OpenBlob(mock.Anything, dgst).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
-				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
+				layoutA.EXPECT().Location().Return("sol/1.0.0/images/img").Maybe()
 
 				layoutB := mocks.NewMockLayout(GinkgoT())
 				layoutB.EXPECT().OpenBlob(mock.Anything, dgst).Return(blobReader(blobContent), nil)

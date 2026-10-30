@@ -78,7 +78,7 @@ var _ = Describe("List Tags", func() {
 			It("skips the failing layout and returns the remaining tags", func() {
 				l1 := mocks.NewMockLayout(GinkgoT())
 				l1.EXPECT().Tags(mock.Anything).Return(nil, errors.New("index.json missing"))
-				l1.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
+				l1.EXPECT().Location().Return("sol/1.0.0/images/img").Maybe()
 
 				l2 := mocks.NewMockLayout(GinkgoT())
 				l2.EXPECT().Tags(mock.Anything).Return([]domain.Tag{"3.22.2", "latest"}, nil)

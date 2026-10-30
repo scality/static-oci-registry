@@ -22,14 +22,14 @@ type layoutBuilder struct {
 	root      string // os.Root base (the FS root)
 	sv        domain.SolutionVersion
 	imageName domain.ImageName
-	imageDir  string // <solution>/<version>/<image> relative to root
+	imageDir  string // <solution>/<version>/images/<image> relative to root
 }
 
-func newLayoutBuilder(t *testing.T, sv domain.SolutionVersion, imageName domain.ImageName) *layoutBuilder { //nolint:unparam // imageName will vary across future tests
+func newLayoutBuilder(t *testing.T, sv domain.SolutionVersion, imageName domain.ImageName) *layoutBuilder {
 	t.Helper()
 	root := t.TempDir()
 
-	imageDir := sv.Solution + "/" + sv.Version + "/" + imageName.String()
+	imageDir := sv.Solution + "/" + sv.Version + "/images/" + imageName.String()
 
 	full := filepath.Join(root, filepath.FromSlash(imageDir))
 	if err := os.MkdirAll(filepath.Join(full, "blobs", "sha256"), 0o755); err != nil {
@@ -108,6 +108,16 @@ func imageManifest(config, layer domain.Digest) domain.Manifest {
 		MediaType:     domain.MediaTypeOCIImageManifest,
 		Config:        &domain.ManifestDescriptor{MediaType: "application/vnd.oci.image.config.v1+json", Digest: config, Size: 1},
 		Layers:        []domain.ManifestDescriptor{{MediaType: "application/vnd.oci.image.layer.v1.tar+gzip", Digest: layer, Size: 1}},
+	}
+}
+
+// --- Location ---
+
+func TestLayoutLocation(t *testing.T) {
+	b := newLayoutBuilder(t, domain.SolutionVersion{Solution: "sol", Version: "1.0.0"}, "docker.io/library/alpine")
+
+	if got, want := b.layout(t).Location(), "sol/1.0.0/images/docker.io/library/alpine"; got != want {
+		t.Fatalf("got location %q, want %q", got, want)
 	}
 }
 

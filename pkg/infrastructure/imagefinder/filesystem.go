@@ -11,6 +11,7 @@ import (
 	"github.com/scality/go-errors"
 	"github.com/scality/static-oci-registry/pkg/domain"
 	"github.com/scality/static-oci-registry/pkg/domain/ocierrors"
+	"github.com/scality/static-oci-registry/pkg/infrastructure/ocilayout"
 	"github.com/scality/static-oci-registry/pkg/service"
 
 	"github.com/hashicorp/go-version"
@@ -42,7 +43,7 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 	l := fs.logger.With(slog.String("image_name", string(imageName)))
 	l.InfoContext(ctx, "Finding image in filesystem registry")
 	// walks the fsroot by solution and version and gathers a list of `solution/version` dirs
-	// such that `solution/version/imageName` exists, is a dir, and is not empty
+	// such that `solution/version/images/imageName` exists, is a dir, and is an OCI layout
 	// return an error if no such directory exists
 	solutions, err := iofs.ReadDir(fs.root.FS(), ".")
 	if err != nil {
@@ -117,11 +118,10 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 		versions = append(versions, unsortedVersions...)
 
 		for _, candidate := range versions {
-			info, err := fs.root.Stat(
-				solution.Name() +
-					"/" + candidate.Name() +
-					"/" + string(imageName),
-			)
+			sv := domain.SolutionVersion{Solution: solution.Name(), Version: candidate.Name()}
+			base := ocilayout.ImageDir(sv, imageName)
+
+			info, err := fs.root.Stat(base)
 			if err != nil {
 				if !os.IsNotExist(err) {
 					// Soft-fail: a single unstattable image dir shouldn't
@@ -138,7 +138,7 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 			}
 
 			if !info.IsDir() {
-				l.WarnContext(ctx, "solution/version/image_name should be a directory",
+				l.WarnContext(ctx, "solution/version/images/image_name should be a directory",
 					slog.String("solution", solution.Name()),
 					slog.String("version", candidate.Name()),
 				)
@@ -146,15 +146,11 @@ func (fs *FileSystem) FindImage(ctx context.Context, imageName domain.ImageName)
 				continue
 			}
 
-			base := solution.Name() + "/" + candidate.Name() + "/" + string(imageName)
 			if !fs.isLayout(ctx, l, base) {
 				continue
 			}
 
-			found[solution.Name()] = append(found[solution.Name()], domain.SolutionVersion{
-				Solution: solution.Name(),
-				Version:  candidate.Name(),
-			})
+			found[solution.Name()] = append(found[solution.Name()], sv)
 		}
 	}
 

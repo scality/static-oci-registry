@@ -10,11 +10,18 @@ follows this hierarchy:
 <solutions>/
     solution1/
         1.0.0/
+            images/
+                image1/
+                image2/
         1.2.0/
+            images/
         2.0.0/
+            images/
     solution2/
         3.5.9/
+            images/
         4.2.0/
+            images/
 ```
 
 > [!NOTE]
@@ -24,7 +31,7 @@ follows this hierarchy:
 
 When an image `image1` from solution `mysolution` is requested, using reference `myregistry.lan/mysolution/image1:v1.2`
 then the registry should iterate over every version sub-directory of `<solutions>/mysolution/` until it finds
-one that contains the requested image.
+one whose `images/` sub-directory contains the requested image. Anything else in a version directory is ignored.
 
 The same logic must be followed when implementing registry discovery endpoints (getting manifests and referrers)
 
@@ -34,7 +41,7 @@ for now, it only supports reading registry contents from a filesystem but the cl
 it extensible for other kinds of content sources.
 
 > [!NOTE]
-> **On-disk format.** Each leaf `<image>/` directory is an
+> **On-disk format.** Each leaf `<version>/images/<image>/` directory is an
 > [OCI Image Layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md) -
 > an `oci-layout` marker file, an `index.json`, and a shared `blobs/` store - not per-tag
 > directories. Tags are expressed as `org.opencontainers.image.ref.name` annotations on
