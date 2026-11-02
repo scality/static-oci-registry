@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -154,6 +155,9 @@ var _ = BeforeSuite(func() {
 		Timeout: timeoutDurationInSeconds * time.Second,
 	}
 
+	defer insecureClient.CloseIdleConnections()
+	defer plainClient.CloseIdleConnections()
+
 	Expect(
 		waitForServer(
 			insecureClient,
@@ -184,26 +188,48 @@ var _ = AfterSuite(func() {
 	defer cancel()
 	defer suite.CleanupFsRoot()
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeoutDurationInSeconds*time.Second)
+	shutdownServer("metrics", metricsServer)
+	shutdownServer("http", httpServer)
+})
+
+// shutdownTimeout must stay above 5s: http.Server.Shutdown treats a
+// connection that has not sent its first request yet as active until it is
+// 5s old, so a 5s deadline can expire on a single stray connection.
+const shutdownTimeout = 15 * time.Second
+
+// shutdownServer stops a test server gracefully, and force-closes it when the
+// graceful shutdown does not finish in time. Shutting down is not what the
+// suite tests, so a slow close is logged rather than failing the suite.
+func shutdownServer(name string, server *http.Server) {
+	if server == nil {
+		return
+	}
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdownCancel()
 
-	if metricsServer != nil {
-		err := metricsServer.Shutdown(shutdownCtx)
-		Expect(err).NotTo(HaveOccurred())
+	err := server.Shutdown(shutdownCtx)
+	if errors.Is(err, context.DeadlineExceeded) {
+		GinkgoWriter.Printf("%s server did not shut down within %s, closing it: %v\n", name, shutdownTimeout, err)
+
+		err = server.Close()
 	}
 
-	if httpServer != nil {
-		err := httpServer.Shutdown(shutdownCtx)
-		Expect(err).NotTo(HaveOccurred())
-	}
-})
+	Expect(err).NotTo(HaveOccurred(), "failed to stop the %s server", name)
+}
 
 func waitForServer(client *http.Client, url string, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		resp, err := client.Get(url)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			return true
+		if err == nil {
+			// Drain and close the body so the connection is released.
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+
+			if resp.StatusCode == http.StatusOK {
+				return true
+			}
 		}
 
 		time.Sleep(100 * time.Millisecond)
