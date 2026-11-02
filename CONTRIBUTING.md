@@ -6,11 +6,11 @@ it is built and why see [DESIGN.md](DESIGN.md).
 
 ## Development environment
 
-There is no devcontainer: install the Go version pinned in [go.mod](./go.mod), Docker and make on
-your `PATH`. `make testfs` needs `skopeo` and `make testcert` needs `openssl`. The test and lint
-workflow additionally uses [ginkgo](https://onsi.github.io/ginkgo/),
-[mockery](https://vektra.github.io/mockery/) and [golangci-lint](https://golangci-lint.run/):
-install them to run the full suite locally.
+The devcontainer in [.devcontainer/](./.devcontainer/) has everything below. Without it, install the
+Go version pinned in [go.mod](./go.mod), Docker and make on your `PATH`. `make testfs` needs `skopeo`
+and `make testcert` needs `openssl`. The test and lint workflow additionally uses
+[ginkgo](https://onsi.github.io/ginkgo/), [mockery](https://vektra.github.io/mockery/) and
+[golangci-lint](https://golangci-lint.run/): install them to run the full suite locally.
 
 Everyday commands:
 
