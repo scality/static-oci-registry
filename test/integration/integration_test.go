@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -197,9 +196,9 @@ var _ = AfterSuite(func() {
 // 5s old, so a 5s deadline can expire on a single stray connection.
 const shutdownTimeout = 15 * time.Second
 
-// shutdownServer stops a test server gracefully, and force-closes it when the
-// graceful shutdown does not finish in time. Shutting down is not what the
-// suite tests, so a slow close is logged rather than failing the suite.
+// shutdownServer stops a test server gracefully. A shutdown that still times
+// out means a handler does not return: this suite is the only place that runs
+// Shutdown on the real handlers, as cmd/main.go does, so it fails here.
 func shutdownServer(name string, server *http.Server) {
 	if server == nil {
 		return
@@ -209,12 +208,6 @@ func shutdownServer(name string, server *http.Server) {
 	defer shutdownCancel()
 
 	err := server.Shutdown(shutdownCtx)
-	if errors.Is(err, context.DeadlineExceeded) {
-		GinkgoWriter.Printf("%s server did not shut down within %s, closing it: %v\n", name, shutdownTimeout, err)
-
-		err = server.Close()
-	}
-
 	Expect(err).NotTo(HaveOccurred(), "failed to stop the %s server", name)
 }
 
