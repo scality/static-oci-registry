@@ -42,6 +42,13 @@ var _ = Describe("Metrics endpoint", Ordered, func() {
 		}
 	})
 
+	// Each spec builds fresh clients, so release their pooled connections:
+	// otherwise they stay open on the servers until AfterSuite shuts them down.
+	AfterEach(func() {
+		metricsClient.CloseIdleConnections()
+		ociClient.CloseIdleConnections()
+	})
+
 	Context("/metrics endpoint plumbing", func() {
 		It("serves Prometheus text format over plain HTTP", func() {
 			resp, body := scrapeMetricsBody(metricsClient)
