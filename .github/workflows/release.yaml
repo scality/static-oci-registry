@@ -14,10 +14,12 @@ on:
           - "beta"
           - "GA"
       version-scope:
-        description: "Version scope"
+        # Bumps the last GA tag, not the last pre-release: while there is no GA
+        # tag, "patch" restarts at v0.0.1-*.
+        description: "Version scope (bumps the last GA tag)"
         required: true
         type: choice
-        default: "patch"
+        default: "minor"
         options:
           - "patch"
           - "minor"
