@@ -16,6 +16,7 @@ import (
 const (
 	indexFileName = "index.json"
 	blobsDirName  = "blobs"
+	imagesDirName = "images"
 	// maxIndexDepth bounds nested-index traversal (image-spec allows nesting).
 	maxIndexDepth = 4
 )
@@ -26,7 +27,7 @@ const (
 type Layout struct {
 	logger   *slog.Logger
 	root     *os.Root
-	path     string // "<solution>/<version>/<image>" relative to root
+	path     string // "<solution>/<version>/images/<image>" relative to root
 	solution domain.SolutionVersion
 
 	index *domain.Index // lazily loaded, request-scoped cache
@@ -35,16 +36,16 @@ type Layout struct {
 var _ service.Layout = (*Layout)(nil)
 
 // NewLayout builds a Layout that reads the OCI image layout at
-// "<sv.Solution>/<sv.Version>/<imageName>" beneath root. The (solution,
-// version) tuple is retained separately so SolutionVersion() can return it
-// without re-parsing the path.
+// ImageDir(sv, imageName) beneath root. The (solution, version) tuple is
+// retained separately so SolutionVersion() can return it without re-parsing
+// the path.
 func NewLayout(
 	logger *slog.Logger,
 	root *os.Root,
 	sv domain.SolutionVersion,
 	imageName domain.ImageName,
 ) *Layout {
-	path := strings.Join([]string{sv.Solution, sv.Version, imageName.String()}, "/")
+	path := ImageDir(sv, imageName)
 
 	return &Layout{
 		logger:   logger.With(slog.String("ocilayout", path)),
@@ -52,6 +53,12 @@ func NewLayout(
 		path:     path,
 		solution: sv,
 	}
+}
+
+// ImageDir returns the "<solution>/<version>/images/<image>" layout directory,
+// relative to the FS root.
+func ImageDir(sv domain.SolutionVersion, imageName domain.ImageName) string {
+	return strings.Join([]string{sv.Solution, sv.Version, imagesDirName, imageName.String()}, "/")
 }
 
 func (l *Layout) Location() string {

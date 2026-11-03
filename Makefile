@@ -35,8 +35,8 @@ testfs: clean
 		version=$$2; \
 		image=$$3; \
 		tag=$$4; \
-		mkdir -p $(TEST_DIR)/$$solution/$$version/$$image; \
-		$(SKOPEO) copy $(SKOPEO_FLAGS) docker://$$image:$$tag oci:$(TEST_DIR)/$$solution/$$version/$$image:$$tag; \
+		mkdir -p $(TEST_DIR)/$$solution/$$version/images/$$image; \
+		$(SKOPEO) copy $(SKOPEO_FLAGS) docker://$$image:$$tag oci:$(TEST_DIR)/$$solution/$$version/images/$$image:$$tag; \
 	done
 	@echo
 	@echo "Created test filesystem in $(TEST_DIR), use:"

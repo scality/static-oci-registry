@@ -65,7 +65,7 @@ also avoids the cost of streaming every byte through a hash function on each pul
 ## On-disk format
 
 Each image is stored as an [OCI Image Layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md)
-under `<solutions>/<solution>/<version>/<image>/`: an `oci-layout` marker, an `index.json`
+under `<solutions>/<solution>/<version>/images/<image>/`: an `oci-layout` marker, an `index.json`
 whose entries carry tags via the `org.opencontainers.image.ref.name` annotation, and a
 shared `blobs/<algorithm>/<digest>` store.
 
@@ -76,7 +76,7 @@ it serves the index, any manifest reachable from it by digest, and the blobs tho
 reference.
 
 Images can be produced with
-`skopeo copy --all docker://<ref> oci:<solutions>/<solution>/<version>/<image>:<tag>`
+`skopeo copy --all docker://<ref> oci:<solutions>/<solution>/<version>/images/<image>:<tag>`
 (repeated tags accumulate into one layout with shared blobs). The on-disk hierarchy may be
 modified while the server runs - solutions, versions, images and tags are read on demand on
 each request, so additions and removals take effect without a restart.

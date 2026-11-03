@@ -38,7 +38,7 @@ type (
 )
 
 func (re *RegistryEntry) ImagePath(root string) string {
-	return root + "/" + re.Solution + "/" + re.Version + "/" + string(re.Image)
+	return root + "/" + re.Solution + "/" + re.Version + "/images/" + string(re.Image)
 }
 
 func ValidateError(err error) {

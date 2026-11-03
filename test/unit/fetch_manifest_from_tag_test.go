@@ -147,7 +147,7 @@ var _ = Describe("Fetch Manifest From Tag", func() {
 			It("skips that layout and returns the result from the next one", func() {
 				layoutA := mocks.NewMockLayout(GinkgoT())
 				layoutA.EXPECT().ResolveTag(mock.Anything, tag).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
-				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
+				layoutA.EXPECT().Location().Return("sol/1.0.0/images/img").Maybe()
 
 				layoutB := mocks.NewMockLayout(GinkgoT())
 				layoutB.EXPECT().ResolveTag(mock.Anything, tag).Return(&domain.FetchManifestOutput{

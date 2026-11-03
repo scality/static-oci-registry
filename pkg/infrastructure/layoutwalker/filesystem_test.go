@@ -13,13 +13,13 @@ import (
 	"github.com/scality/static-oci-registry/pkg/infrastructure/layoutwalker"
 )
 
-// writeLayout creates a minimal OCI Image Layout at <root>/<sol>/<ver>/<image>
+// writeLayout creates a minimal OCI Image Layout at <root>/<sol>/<ver>/images/<image>
 // with a single tagged entry in index.json - enough for the image finder to
 // recognise it and for the yielded Layout.Tags to return the tag.
 func writeLayout(t *testing.T, root, sol, ver, image, tag string) {
 	t.Helper()
 
-	dir := filepath.Join(root, sol, ver, image)
+	dir := filepath.Join(root, sol, ver, "images", image)
 	if err := os.MkdirAll(filepath.Join(dir, "blobs", "sha256"), 0o755); err != nil {
 		t.Fatal(err)
 	}

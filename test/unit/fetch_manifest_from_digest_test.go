@@ -167,7 +167,7 @@ var _ = Describe("Fetch Manifest From Digest", func() {
 
 				layoutA := mocks.NewMockLayout(GinkgoT())
 				layoutA.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(nil, errors.Wrap(domain.ErrRegistryInternal))
-				layoutA.EXPECT().Location().Return("sol/1.0.0/img").Maybe()
+				layoutA.EXPECT().Location().Return("sol/1.0.0/images/img").Maybe()
 
 				layoutB := mocks.NewMockLayout(GinkgoT())
 				layoutB.EXPECT().ReadManifestByDigest(mock.Anything, dgst).Return(&domain.FetchManifestOutput{

@@ -71,7 +71,7 @@ jobs:
       # conformance tool to use existing content instead of pushing its own.
       - name: Compute manifest and blob digests for Pull tests
         run: |
-          LAYOUT=${{ github.workspace }}/fs/my-solution/v4.5.0/docker.io/library/alpine
+          LAYOUT=${{ github.workspace }}/fs/my-solution/v4.5.0/images/docker.io/library/alpine
           MANIFEST_DIGEST=$(jq -r '.manifests[] | select(.annotations["org.opencontainers.image.ref.name"]=="3.22") | .digest' "$LAYOUT/index.json")
           MT=$(jq -r '.manifests[] | select(.annotations["org.opencontainers.image.ref.name"]=="3.22") | .mediaType' "$LAYOUT/index.json")
           BLOB_SRC_DIGEST="$MANIFEST_DIGEST"
