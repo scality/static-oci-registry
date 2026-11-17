@@ -1,6 +1,5 @@
 version: "2"
 run:
-  go: 1.25.1
   issues-exit-code: 100
   tests: true
 linters:
