@@ -11,9 +11,3 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 USER vscode
-
-# Same version as the CI mockery step.
-# renovate: datasource=github-releases depName=vektra/mockery
-ARG MOCKERY_VERSION=v3.9.1
-RUN go install github.com/vektra/mockery/v3@${MOCKERY_VERSION} \
-  && go clean -modcache -cache

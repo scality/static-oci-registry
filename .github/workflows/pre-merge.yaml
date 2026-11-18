@@ -25,11 +25,6 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
-      - name: Install mockery
-        env:
-          # renovate: datasource=github-releases depName=vektra/mockery
-          MOCKERY_VERSION: v3.9.1
-        run: go install github.com/vektra/mockery/v3@${{ env.MOCKERY_VERSION }}
       - name: Ensure go generate as been run if needed
         # We run go generate and then check if there are any changes
         run: |
